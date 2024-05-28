@@ -3,7 +3,7 @@ import pandas as pd
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
-import datasets
+
 from datasets import load_dataset,Dataset,DatasetDict
 import datetime
 from gluonts.time_feature import time_features_from_frequency_str
@@ -35,15 +35,23 @@ def preprocess_data(data,time_frame='1h'):
     data['low']=data['low'].apply(pd.to_numeric)
     data['volume']=data['volume'].apply(pd.to_numeric)
     data['y']=data['close'].copy()
-    data['ds']=data.index.copy()
 
-    for i ,f  in enumerate(time_funcs):
-        f_name=f.__repr__().split(' ')[1]
+    if 'date_close' in data.columns:
+        data=data.reset_index(drop=True)
+        data['date_close']=data['date_close'].apply(pd.Timestamp)
 
-        data[f'feature_{f_name}']=data['ds'].apply(f).copy()
-    data=data.drop('ds',axis=1)
-    if'date_close' in data.columns:
-        data=data.drop('date_close',axis=1)
+        data=data.set_index('date_close')
+        
+    if 'date_open' in data.columns:
+        data=data.drop(['date_open'],axis=1)
+
+    for i ,t_func  in enumerate(time_funcs):
+        # print (i,t_func)
+        f_name=t_func.__repr__().split(' ')[1]
+
+        data[f'feature_{f_name}']=t_func(data.index)
+
+
     data['feature_MA_20'] = data['close'].rolling(window=20).mean()
     data['feature_MA_50'] = data['close'].rolling(window=50).mean()
     data['feature_MA_200'] = data['close'].rolling(window=200).mean()
@@ -54,7 +62,8 @@ def preprocess_data(data,time_frame='1h'):
 
     data = data.replace((np.inf, -np.inf,np.nan), 0)
     data=data-data.min(0)/(data.max(0)-data.min(0))
-
+    data['ds']=data.index.values
+    data['ds']=data['ds'].apply(pd.Timestamp)
     return data
 
 def stack_arrays(data,name=None,n_samples=24,prediction_window=4,feature_id=1):
