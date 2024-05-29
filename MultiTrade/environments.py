@@ -18,7 +18,6 @@ import sqlite3 as db
 from gym_trading_env.environments import TradingEnv
 
 from gym_trading_env.utils.history import History
-from gym_trading_env.utils.portfolio import Portfolio, TargetPortfolio
 
 class BoxTradingEnv(TradingEnv):
 

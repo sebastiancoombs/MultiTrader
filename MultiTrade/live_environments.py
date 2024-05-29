@@ -1,8 +1,13 @@
+import datetime
 import sqlite3 as db
+import time
 
 import numpy as np
 import pandas as pd
 from binance.spot import Spot
+from gym_trading_env.utils.history import History
+from gym_trading_env.utils.portfolio import TargetPortfolio
+from tqdm.autonotebook import tqdm
 from utils.utils import preprocess_data, symbol_map
 
 from .environments import NeuralForecastingTradingEnv
