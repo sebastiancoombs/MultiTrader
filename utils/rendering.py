@@ -17,9 +17,6 @@ import sqlite3 as db
 class LiveRenderer(Renderer):
     def __init__(self, render_logs_dir):
         super().__init__(render_logs_dir)
-
-        self.app.config["EXPLAIN_TEMPLATE_LOADING"] = True
-        self.app.template_folder='./templates/'
         
 
 
@@ -49,8 +46,7 @@ class LiveRenderer(Renderer):
             
             render_names=[t[0] for t in cursor.fetchall()]
             render_names=[name for name in render_names if 'trade' in name]
-            conn.close()
-            return render_template('templates/index.html', render_names = render_names)
+            return render_template('index.html', render_names = render_names)
 
         @self.app.route("/update_data/<name>")
         def update(name = None):

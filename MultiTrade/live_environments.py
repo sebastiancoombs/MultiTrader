@@ -483,6 +483,7 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         else:
             history_df.to_sql(f'{self.symbol}_trade_history',conn,if_exists='append',index=False)
         conn.close()
+    
     def reset(self,seed = None, options=None,reset_account=None):
         self._idx=-1
         self._step = 0
@@ -494,13 +495,17 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         if self._restore_trading:
             self._load_history()
             reward=self.reward_function(self.historical_info)
-
-        if reset_account:
+            if reset_account:
+                try:
+                    self.reset_account()
+                except Exception as e:
+                    print(e)
+        elif self._restore_trading==False:
             try:
                 self.reset_account()
             except Exception as e:
                 print(e)
-            
+
         self._set_df(self.get_data())
         self._portfolio  = TargetPortfolio(
             position = self._position,
