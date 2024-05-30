@@ -8,7 +8,7 @@ from binance.spot import Spot
 from binance.websocket.spot.websocket_stream import SpotWebsocketStreamClient
 from binance.websocket.spot.websocket_api import SpotWebsocketAPIClient
 from gym_trading_env.utils.history import History
-from gym_trading_env.utils.portfolio import TargetPortfolio
+from gym_trading_env.utils.portfolio import TargetPortfolio,Portfolio
 from tqdm.autonotebook import tqdm
 from utils.utils import preprocess_data, symbol_map, binanace_col_map
 
@@ -42,6 +42,8 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         self._streaming=streaming
         self._restore_trading=restore_trading
         self._history_path=history_path
+        self.time_frame=time_frame
+
         self.conn = db.connect(history_path)
 
         self.agent=agent
@@ -54,7 +56,6 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         self.quote_asset_precision=None
         self.base_asset_precision=None
 
-        self.time_frame=time_frame
         self.action_map={x:pct for x,pct in enumerate(kwargs['positions'])}
         self.side_map={-1:'SELL',1:'BUY',0:'close'}
         self.test_net=test_net
@@ -438,15 +439,20 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
             print(f'{self.base_asset}: {current_size} {self.quote_asset}: {current_dols}')
 
     def build_history(self,reward=None,initial_record=False):
+        self.get_account()
+        self._portfolio=Portfolio(
+            asset = self.get_balance(self.base_asset),
+            fiat = self.get_balance(self.quote_asset),
+        )
         hist_config=dict(idx = self._idx,
                 step = self._step,
-                date =pd.Timestamp(datetime.datetime.now()) ,
-                position_index =0 if self._position ==0 else self.positions.index(round(self._position,2)),
+                date = pd.Timestamp(datetime.datetime.now()) ,
+                position_index = 0 if self._position ==0 else self.positions.index(round(self._position,2)),
                 position = self._position,
                 real_position = self._position,
                 portfolio_valuation = self._portfolio.valorisation(self._get_price()),
                 portfolio_distribution = self._portfolio.get_portfolio_distribution(),
-                reward = reward if reward!=None else self.reward_function(self.historical_info))
+                reward = reward if reward != None else self.reward_function(self.historical_info))
         data_dict=self.df.iloc[[self._idx]].to_dict('records')[0]
         hist_config.update(data_dict)
         if not initial_record:
@@ -507,10 +513,11 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
                 print(e)
 
         self._set_df(self.get_data())
-        self._portfolio  = TargetPortfolio(
-            position = self._position,
-            value = self.portfolio_initial_value,
-            price = self._get_price()
+        self.get_account()
+        self._portfolio  = Portfolio(
+            asset = self.get_balance(self.base_asset),
+            fiat = self.get_balance(self.quote_asset),
+
         )
         
         

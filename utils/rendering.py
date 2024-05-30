@@ -18,7 +18,8 @@ class LiveRenderer(Renderer):
     def __init__(self, render_logs_dir):
         super().__init__(render_logs_dir)
         
-
+        self.add_metric('Quote Balance',lambda df : f"{(df['portfolio_distribution_fiat'].iloc[-1]):0.2f}%")
+        self.add_metric('Asset Balance',lambda df : f"{(df['portfolio_distribution_asset'].iloc[-1] ):0.2f}%")
 
     def connect_to_db(self):
         conn = db.connect(self.render_logs_dir)

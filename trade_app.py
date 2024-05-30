@@ -65,7 +65,7 @@ live_env_config=dict(
 
 live_env=LiveTradingEnv(**live_env_config)
 
-live_env.reset(reset_account=False)
+
 
 
 def on_start(message):
@@ -75,7 +75,7 @@ def on_start(message):
         action,_,states=live_env.agent.compute_single_action(obs,explore=False)
         obs, reward, terminated, truncated, info=live_env.live_step(action,wait=False)
 
-def on_close(_):
+def on_close(_,metric):
         end_time=datetime. datetime.now().strftime("%m-%d-%Y %H:%M")
         print (f'FINISH trading session at {end_time}')
         live_env.reset_account()
@@ -88,7 +88,23 @@ my_client = SpotWebsocketStreamClient(
                                     on_message=live_env.stream_step,
                                     stream_url='wss://testnet.binance.vision')
 
+class LiveTradingApp(LiveRenderer):
+        def __init__(self,render_logs_dir,trading_env):
+                super().__init__(render_logs_dir)
+                self.trading_env=trading_env
+                
 
+        def run(self):
+                my_client = SpotWebsocketStreamClient(
+                        on_close=on_close,
+                        on_open=on_start,
+                        on_error=on_close,
+                        on_message=self.trading_env.stream_step,
+                        stream_url='wss://testnet.binance.vision')
+                
+                my_client.kline(symbol=self.trading_env.symbol,interval=self.trading_env.time_frame)
+                
+                super().run()
 
 if __name__ == '__main__':
         #trade for a fulll week the socket manager will time out after 24 hours
@@ -100,10 +116,12 @@ if __name__ == '__main__':
                                         on_error=on_close,
                                         on_message=live_env.stream_step,
                                         stream_url='wss://testnet.binance.vision')
-                trade_monitor=LiveRenderer('Trade_history/trade.db')
-                app=threading.Thread(target=trade_monitor.run)
+                
+                renderer=LiveTradingApp('Trade_history/trade.db',live_env)
+                renderer.run()
+                # app=threading.Thread(target=trade_monitor.run)
                 wait_time=pd.Timedelta(hours=24).total_seconds()
-                my_client.kline(symbol="ETHUSDT",interval="1h")
-                app.start()
+                # my_client.kline(symbol="ETHUSDT",interval="1h")
+
                 print('waiting to reconnect')
                 time.sleep(wait_time)
