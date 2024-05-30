@@ -17,6 +17,9 @@ import sqlite3 as db
 class LiveRenderer(Renderer):
     def __init__(self, render_logs_dir):
         super().__init__(render_logs_dir)
+
+        self.app.config["EXPLAIN_TEMPLATE_LOADING"] = True
+        self.app.template_folder='./templates/'
         
 
 
@@ -24,12 +27,15 @@ class LiveRenderer(Renderer):
         conn = db.connect(self.render_logs_dir)
         return conn
     
-    TTLCache(maxsize=200, ttl=60)
+
     def get_data(self,conn,name=None):
         
         #####################################################################
         #start of part that I need to refresh
-        return pd.read_sql(f'select * from {name}',conn)
+        data=pd.read_sql(f'select * from {name}',conn)
+        if 'date' not in list(data.columns):
+            data['date']=data['ds'].copy()
+        return data
 
     
     def run(self):
@@ -42,7 +48,9 @@ class LiveRenderer(Renderer):
             render_names =cursor.execute(sql_query)
             
             render_names=[t[0] for t in cursor.fetchall()]
-            return render_template('index.html', render_names = render_names)
+            render_names=[name for name in render_names if 'trade' in name]
+            conn.close()
+            return render_template('templates/index.html', render_names = render_names)
 
         @self.app.route("/update_data/<name>")
         def update(name = None):

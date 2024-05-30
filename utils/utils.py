@@ -26,6 +26,17 @@ symbol_map={'ADABNB': 0,
  'XRPETH': 15,
  'XRPUSDT': 16}
 
+binanace_col_map = {
+                    "t": "date_open",
+                    "T": "date_close",
+                    "s": "symbol",
+                    "o": "open",
+                    "c": "close",
+                    "h": "high",
+                    "l": "low",
+                    "v": "volume",
+                    "x": "is_closed",
+                }
 def preprocess_data(data,time_frame='1h'):
     returns=[2,5,10,15,20,25,30]
     time_funcs=time_features_from_frequency_str(time_frame)

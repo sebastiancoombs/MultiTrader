@@ -1,14 +1,16 @@
 import datetime
 import sqlite3 as db
 import time
-
+import json
 import numpy as np
 import pandas as pd
 from binance.spot import Spot
+from binance.websocket.spot.websocket_stream import SpotWebsocketStreamClient
+from binance.websocket.spot.websocket_api import SpotWebsocketAPIClient
 from gym_trading_env.utils.history import History
 from gym_trading_env.utils.portfolio import TargetPortfolio
 from tqdm.autonotebook import tqdm
-from utils.utils import preprocess_data, symbol_map
+from utils.utils import preprocess_data, symbol_map, binanace_col_map
 
 from .environments import NeuralForecastingTradingEnv
 
@@ -22,7 +24,9 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
             time_frame='1h',
             target_symbol='ETH/USDT',
             restore_trading=True,
+            streaming=False,
             history_path='Trade_history/trade.db',
+            agent=None,
             *args,
             **kwargs,
             ):
@@ -35,10 +39,12 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
             'position',
             
             ])
+        self._streaming=streaming
         self._restore_trading=restore_trading
-        
+        self._history_path=history_path
         self.conn = db.connect(history_path)
 
+        self.agent=agent
         self._n_steps=0
         self._trade_info=None
         self.min_quote_size=None
@@ -57,18 +63,19 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         self.symbol=''.join([self.base_asset,self.quote_asset])
         self._rew=0
         self._current_valuation=0
-        self.client=self.connect_client()
-
+        self.client=None
+        self.stream_client =None
+        self._preprocess_data=preprocess_data
+        client=self.connect_client()
+        self.client=client
         self.account=self.get_account()
         self.initial_base_balance=self.get_balance(self.base_asset)
         self.initial_quote_balance=self.get_balance(self.quote_asset)
         self.set_trade_rules()
         self.cash=self.initial_base_balance
-        data=self.get_data()
+        data=self.get_data(initial_pull=True)
         kwargs['df']=data
         kwargs['portfolio_initial_value']=self.initial_quote_balance
-
-
 
         super().__init__(*args,**kwargs)
         self.spec.id='LiveNeuralForecastingTradingEnv'
@@ -77,15 +84,28 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
             self._load_history()
 
     def connect_client(self):
+        if self.client!=None:
+            del self.client
 
         if self.test_net:
-            # self.stream_client = SpotWebsocketStreamClient(stream_url='wss://testnet.binance.vision')
+            if self._streaming:
+                self.stream_client = SpotWebsocketStreamClient(stream_url='wss://testnet.binance.vision')
+
             client=Spot(api_key=self.api_key,api_secret=self.api_secret,base_url='https://testnet.binance.vision')
 
         else:
             client=Spot(api_key=self.api_key,api_secret=self.api_secret,base_url='https://api3.binance.com')
-        return client
+            if self._streaming:
+                self.stream_client = SpotWebsocketStreamClient(stream_url='wss://testnet.binance.vision')
 
+
+        
+        return client
+    
+    def connect_to_db(self):
+        conn = db.connect(self._history_path)
+        return conn
+    
     def set_trade_rules(self):
         trade_info=pd.DataFrame(self.client.exchange_info(self.symbol)['symbols'][0]['filters'])
         trade_info=trade_info.set_index('filterType')
@@ -213,7 +233,7 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         print('portfoliio',current_portfolio)
 
         print(f'''Trade {trade_from_to[0]}->{trade_from_to[1]}
-              {position_change}, so {round(dollar_val,2)}{self.quote_asset}/ {asset_size}{self.base_asset},
+              {position_change}, so {round(dollar_val,2)}{self.quote_asset} / {asset_size:.8f} {self.base_asset},
               {side_str} {self.base_asset}:{asset_size} for {dollar_val:.2f}$ at {price} {self.symbol}'''
               )
         
@@ -247,24 +267,106 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         current_position=history['position',-1]
         return current_position
 
-    def get_data(self):
-        
+    def get_data(self,initial_pull=False):
+        if self._streaming and not initial_pull:
+            data = self.get_stream_data()
+        else:
+            data = self.get_klines()
+
+        data=self._preprocess_data(data)
+
+        data['ds']=data.index.copy()
+        data['symbol'] = self.symbol
+        data['unique_id']=symbol_map[self.symbol]
+        data['is_closed']=True
+        conn=self.connect_to_db()
+        if initial_pull:
+            data.to_sql(f'{self.symbol}_candle_history',conn,if_exists='replace',index=False)
+        data=data.drop(['is_closed'],axis=1)
+        conn.close()
+
+        return data
+    
+    def get_klines(self):
+
         data_list=self.client.klines(self.symbol, self.time_frame, limit=self.context_length*2)
         columns=['date_open','open','high','low','close','volume','date_close','QA_volume','N_trades','BA_volume','BQ_volume','unused']
         data=pd.DataFrame(data_list,columns=columns)
 
         data['date_close']=data['date_close'].apply(pd.to_datetime,unit='ms')
-        # data['date_close']=data['date_close'].apply(pd.Timestamp)
+
         data=data.set_index('date_close')
         data=data[['open','high','low','close','volume']]
+        return data
+    
+    def get_stream_data(self):
+         
+        query=f"""SELECT * FROM f'{self.symbol}_candle_history' 
+        ORDER BY ds ASC
+        WHERE Is_Closed= true 
+        LAST {self.context_length*2}"""
+        conn=self.connect_to_db()
+        
 
-        data=preprocess_data(data)
+        data=pd.read_sql(query,conn)
+        data=data.drop(['Is_Closed'],axis=1)
 
+        data=data.set_index('date_close')
+        
+
+        data=self._preprocess_data(data)
         data['ds']=data.index.copy()
+
         data['symbol'] = self.symbol
         data['unique_id']=symbol_map[self.symbol]
+        
+        conn.close()
 
         return data
+    
+    def _stream_data_handler(self, message):
+        try:
+            # data=ast.literal_eval(message)
+
+            # print(message)
+            message_data=json.loads(message)
+            k_data=message_data['k']
+
+
+            # print(type(data),data)
+            data=pd.DataFrame([k_data])
+            
+            data.columns=data.columns.map(binanace_col_map)
+            data=data[[c for c in binanace_col_map.values() if c in data.columns]]
+
+            data=data.drop('date_open',axis=1)
+            data["date_close"]=pd.to_datetime(data["date_close"],unit='ms')
+            data=data.set_index('date_close')
+            data['symbol'] = self.symbol
+            data['unique_id']=symbol_map[self.symbol]
+
+            conn=db.connect(self._history_path)
+            data.to_sql(f'{self.symbol}_candle_history',conn,if_exists='append',index=False)
+            return k_data['x']
+        
+        except Exception as e: 
+            print('bad_data',message)
+            print(e)
+            return False
+        
+    def stream_step(self,client,message):
+
+        do_trade=self._stream_data_handler(message)
+        if do_trade:
+            data=self.get_data()
+
+            self._set_df(data)
+            self._prep_forecasts()
+            self._set_df(data)
+
+            obs = self._get_obs()
+            action,_,states=self.agent.compute_single_action(obs,explore=False)
+            obs, reward, terminated, truncated, info=self.live_step(action,wait=False)
 
     def wait_for_reward(self):
         self.client=self.connect_client()
@@ -354,8 +456,9 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
     def _load_history(self,position=None):
         
         self.historical_info = History(max_size=1000)
+        conn=self.connect_to_db()
 
-        history_df=pd.read_sql(f'select * from {self.symbol}_trade_history',self.conn)
+        history_df=pd.read_sql(f'select * from {self.symbol}_trade_history',conn)
         history_df=history_df.tail(len(self.df))
         history=history_df.to_dict('records')
         for i,h in enumerate(history):
@@ -368,17 +471,19 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
                 self.historical_info.add(**h)
         
         self._position=position if position!=None else round(self.historical_info["position", -1],2)
-
+        conn.close()
+        
     def _save_history(self):
         history_df=pd.DataFrame([self.historical_info[-1]])
+        conn=self.connect_to_db()
 
         if self._restore_trading==False and self._step==0:
             
-            history_df.to_sql(f'{self.symbol}_trade_history',self.conn,if_exists='replace',index=False)
+            history_df.to_sql(f'{self.symbol}_trade_history',conn,if_exists='replace',index=False)
         else:
-            history_df.to_sql(f'{self.symbol}_trade_history',self.conn,if_exists='append',index=False)
-            
-    def reset(self,seed = None, options=None,reset_account=False):
+            history_df.to_sql(f'{self.symbol}_trade_history',conn,if_exists='append',index=False)
+        conn.close()
+    def reset(self,seed = None, options=None,reset_account=None):
         self._idx=-1
         self._step = 0
         self._limit_orders = {}
@@ -389,6 +494,7 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         if self._restore_trading:
             self._load_history()
             reward=self.reward_function(self.historical_info)
+
         if reset_account:
             try:
                 self.reset_account()
