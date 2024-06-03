@@ -4,7 +4,7 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 
-from datasets import load_dataset,Dataset,DatasetDict
+
 import datetime
 from gluonts.time_feature import time_features_from_frequency_str
 
@@ -158,101 +158,6 @@ def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1):
         # data=data.to_pickle(file)
     big_data=pd.concat(big_data,axis=axis)
     return big_data
-
-def build_dataset(data=None,
-                  prediction_window=2,
-                    n_samples=24,
-                    look_back=30,
-                    start_date=datetime.datetime(year= 2024, month= 2, day=1),
-                    target_pair='ETH/USDT',
-                    time_frame='1h'
-                    ):
-    if isinstance(data,type(None)):
-        data=build_market_image(target_pair=target_pair,
-                            time_frame=target_pair)
-    
-    target_pair=target_pair.replace('/','')
-    
-    ## get the data splittng dates
-    split_date=start_date+datetime.timedelta(days=look_back)
-    end_date=split_date+datetime.timedelta(days=look_back)
-
-    train_data=data[start_date:split_date]
-    test_data=data[split_date:end_date]
-    data=preprocess_data(data
-                            )
-    
-    train_list,val_list=stack_arrays(train_data,
-                                     name=target_pair,prediction_window=prediction_window,
-                                     n_samples=n_samples,
-                                     )
-    
-    test_list,test_val_list=stack_arrays(test_data,
-                                         name=target_pair,prediction_window=prediction_window,
-                                         n_samples=n_samples,
-                                         )
-    crypto=DatasetDict()
-    crypto['train']=Dataset.from_list(train_list,)
-    crypto['validation']=Dataset.from_list(val_list)
-    crypto['test']=Dataset.from_list(test_list)
-    crypto['test_validation']=Dataset.from_list(test_val_list)
-    return crypto
-
-
-
-def build_huggface_data_set(time_frame='1h',
-                           
-                            prediction_window=2,
-                            n_samples=24,
-                            look_back=30,
-                            start_date=datetime.datetime(year= 2024, month= 2, day=1),
-                            ):
-    files=glob.glob(f'data/**{time_frame}.pkl',)
-
-    big_train_list=[]
-    big_val_list=[]
-    big_test_list=[]
-    big_test_val_list=[]
-    for i,file in enumerate(files):
-        pair=file.split('-')[1]
-        data=pd.read_pickle(file)
-        
-        data=preprocess_data(data)
-        # display(data.head(1))
-   
-        ## get the data splittng dates
-        split_date=start_date+datetime.timedelta(days=look_back)
-        end_date=split_date+datetime.timedelta(days=look_back)
-
-        train_data=data[start_date:split_date]
-        test_data=data[split_date:end_date]
-        
-        train_list,val_list=stack_arrays(train_data,
-                                        name=pair,
-                                        prediction_window=prediction_window,
-                                        n_samples=n_samples,
-                                        feature_id=i
-                                        )
-        
-        test_list,test_val_list=stack_arrays(test_data,
-                                            name=pair,
-                                            prediction_window=prediction_window,
-                                            n_samples=n_samples,
-                                            feature_id=i
-                                            )
-        
-        [big_train_list.append(x) for x in train_list]
-        [big_val_list.append(x) for x in val_list]
-        [big_test_list.append(x) for x in test_list]
-        [big_test_val_list.append(x) for x in test_val_list]
-
-    crypto=DatasetDict()
-    crypto['train']=Dataset.from_list(big_train_list,)
-    crypto['validation']=Dataset.from_list(big_val_list)
-    crypto['test']=Dataset.from_list(big_test_list)
-    crypto['test_validation']=Dataset.from_list(big_test_val_list)
-    return crypto
-
 
 def sharpe_reward(history):
     current_position=history['position',-1]

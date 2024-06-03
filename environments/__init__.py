@@ -1,10 +1,5 @@
 
 from gymnasium.envs.registration import register
-import gym_trading_env
-import numpy as np
-from typing import Any
-import utils.forecast_utils as forecast_utils
-import utils
 
 register(
     id='BoxTradingEnv',

@@ -15,12 +15,13 @@ import sqlite3 as db
 
 
 class LiveRenderer(Renderer):
-    def __init__(self, render_logs_dir):
+    def __init__(self, render_logs_dir,quote_asset="USD",base_asset="ETH"):
         super().__init__(render_logs_dir)
         
-        self.add_metric('Quote Balance',lambda df : f"{(df['portfolio_distribution_fiat'].iloc[-1]):0.2f}%")
-        self.add_metric('Asset Balance',lambda df : f"{(df['portfolio_distribution_asset'].iloc[-1] ):0.2f}%")
-
+        self.add_metric(f'Quote Balance:',lambda df : f"{(df['portfolio_distribution_fiat'].values[-1]):0.2f} {quote_asset} ")
+        self.add_metric(f'Asset Balance:',lambda df : f"{(df['portfolio_distribution_asset'].values[-1]):0.2f} {base_asset}")
+        self.add_metric(f'Total Valuation:',lambda df : f"{(df['portfolio_valuation'].values[-1]):0.2f} {quote_asset}")
+        
     def connect_to_db(self):
         conn = db.connect(self.render_logs_dir)
         return conn
@@ -36,7 +37,7 @@ class LiveRenderer(Renderer):
         return data
 
     
-    def run(self):
+    def run(self,**kwargs):
         
         @self.app.route("/")
         def index():
@@ -63,6 +64,6 @@ class LiveRenderer(Renderer):
             self.compute_metrics(self.df)
             return jsonify([{'name':metric['name'], 'value':metric['value']} for metric in self.metrics])
 
-        self.app.run()
+        self.app.run(**kwargs)
 
     

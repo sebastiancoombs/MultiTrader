@@ -1,0 +1,40 @@
+from binance.spot import Spot
+from coinbase.websocket import WSClient
+from coinbase.rest import RESTClient 
+
+client_types={
+    'coinbase':RESTClient ,
+    'binanace': Spot
+}
+websocket_types={
+    'coinbase':RESTClient ,
+    'binanace': Spot
+}
+class ClientManager():
+    def __init__(self,api_key,api_secret,exchange='binance'):
+        self.exchange=exchange
+        self.client=self.connect_client()
+
+
+    def connect_client(self,api_key,api_secret,exchange):
+        if self.client!=None:
+            del self.client
+
+        if self.test_net:
+            if exchange=="binance":
+                base_url='https://testnet.binance.vision'
+
+            elif exchange=="coinbase":
+                pass
+            
+
+        else:
+            if exchange=="binance":
+
+                base_url='https://api3.binance.com'
+            
+            elif exchange=="coinbase":
+                pass
+
+        client=client_types[exchange](api_key,api_secret,base_url=base_url)
+        return client

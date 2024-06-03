@@ -5,14 +5,46 @@ import json
 import numpy as np
 import pandas as pd
 from binance.spot import Spot
-from binance.websocket.spot.websocket_stream import SpotWebsocketStreamClient
-from binance.websocket.spot.websocket_api import SpotWebsocketAPIClient
+
 from gym_trading_env.utils.history import History
-from gym_trading_env.utils.portfolio import TargetPortfolio,Portfolio
+from gym_trading_env.utils.portfolio import Portfolio
 from tqdm.autonotebook import tqdm
 from utils.utils import preprocess_data, symbol_map, binanace_col_map
 
 from .environments import NeuralForecastingTradingEnv
+
+
+class LiveHistory(History):
+    def __init__(self, max_size = 10000):
+        super.__init__(max_size=max_size)
+    
+    def set(self, **kwargs):
+        values = []
+        columns = []
+        for name, value in kwargs.items():
+            if isinstance(value, list):
+                columns.extend([f"{name}_{i}" for i in range(len(value))])
+                values.extend(value[:])
+            elif isinstance(value, dict):
+                columns.extend([f"{name}_{key}" for key in value.keys()])
+                values.extend(list(value.values()))
+            else:
+                columns.append(name)
+                values.append(value)
+        if columns == self.columns:
+            self.history_storage[self.size, :] = values
+            self.size = min(self.size+1, self.height)
+    
+        else:
+            col_ids=[]
+            for col in self. columns:
+                if col in columns:
+                    c_id=self.columns.index(col)
+                    col_ids.append(c_id)
+            self.history_storage[self.size, col_ids] = values
+            self.size = min(self.size+1, self.height)
+
+
 
 
 class LiveTradingEnv(NeuralForecastingTradingEnv):
@@ -65,10 +97,13 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         self._rew=0
         self._current_valuation=0
         self.client=None
+        self.listen_key=None
         self.stream_client =None
         self._preprocess_data=preprocess_data
         client=self.connect_client()
+        listen_key=client.new_listen_key()['listenKey']
         self.client=client
+        self._listen_key=listen_key
         self.account=self.get_account()
         self.initial_base_balance=self.get_balance(self.base_asset)
         self.initial_quote_balance=self.get_balance(self.quote_asset)
@@ -89,15 +124,12 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
             del self.client
 
         if self.test_net:
-            if self._streaming:
-                self.stream_client = SpotWebsocketStreamClient(stream_url='wss://testnet.binance.vision')
 
             client=Spot(api_key=self.api_key,api_secret=self.api_secret,base_url='https://testnet.binance.vision')
 
         else:
             client=Spot(api_key=self.api_key,api_secret=self.api_secret,base_url='https://api3.binance.com')
-            if self._streaming:
-                self.stream_client = SpotWebsocketStreamClient(stream_url='wss://testnet.binance.vision')
+
 
 
         
@@ -119,6 +151,8 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         
         self.quote_asset_precision=self.client.exchange_info(self.symbol)['symbols'][0]['quotePrecision']
         self.base_asset_precision=self.client.exchange_info(self.symbol)['symbols'][0]['baseAssetPrecision']
+
+
 
     def live_step(self,position_index,wait=True):
 
@@ -282,7 +316,7 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         data['is_closed']=True
         conn=self.connect_to_db()
         if initial_pull:
-            data.to_sql(f'{self.symbol}_candle_history',conn,if_exists='replace',index=False)
+            data.to_sql(f'{self.symbol}_candle_history',conn,if_exists='replace',index=True)
         data=data.drop(['is_closed'],axis=1)
         conn.close()
 
@@ -342,12 +376,13 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
 
             data=data.drop('date_open',axis=1)
             data["date_close"]=pd.to_datetime(data["date_close"],unit='ms')
+            data["ds"]=data["date_close"].copy()
             data=data.set_index('date_close')
             data['symbol'] = self.symbol
             data['unique_id']=symbol_map[self.symbol]
 
             conn=db.connect(self._history_path)
-            data.to_sql(f'{self.symbol}_candle_history',conn,if_exists='append',index=False)
+            data.to_sql(f'{self.symbol}_candle_history',conn,if_exists='append',index=True)
             return k_data['x']
         
         except Exception as e: 
@@ -355,10 +390,12 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
             print(e)
             return False
         
-    def stream_step(self,client,message):
+    def stream_step(self,socket_manager,message):
 
         do_trade=self._stream_data_handler(message)
         if do_trade:
+            listen_key=self.client.renew_listen_key(self._listen_key)
+            print(listen_key)
             data=self.get_data()
 
             self._set_df(data)
@@ -438,6 +475,60 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
             print('no need to reset')
             print(f'{self.base_asset}: {current_size} {self.quote_asset}: {current_dols}')
 
+    def close_positions(self):
+        ##update account
+        self.account=self.get_account()
+
+        price=self._get_price()
+        ##Get current_valuation
+        current_size=self.get_balance(self.base_asset)
+        current_dols=self.get_balance(self.quote_asset)
+        total_valuation=current_size*price
+        ##split in half to know how much to distribute to each side
+        trade_size=self.normalize_asset_size(current_size)
+
+        params = {
+            'symbol': self.symbol,
+            'side':'SELL',
+            'type': 'MARKET',
+            # 'quoteOrderQty':dollar_val,
+            'quantity':trade_size,
+            }
+        
+        print('Close out account')
+        print(params)
+        self.client.new_order(**params)
+
+    def format_history(self, **kwargs):
+        values = []
+        columns = []
+        for name, value in kwargs.items():
+            if isinstance(value, list):
+                columns.extend([f"{name}_{i}" for i in range(len(value))])
+                values.extend(value[:])
+            elif isinstance(value, dict):
+                columns.extend([f"{name}_{key}" for key in value.keys()])
+                values.extend(list(value.values()))
+            else:
+                columns.append(name)
+                values.append(value)
+
+        if columns == self.historical_info.columns:
+            hist_dict=dict(zip(columns,values))
+        else:
+            col_ids=[]
+            updated_values=[]
+            for col in self.historical_info. columns:
+                if col in columns:
+                    c_id=columns.index(col)
+                    val=values[c_id]
+                    updated_values.append(val)
+                else:
+                    updated_values.append(0)
+            hist_dict=dict(zip(self.historical_info.columns,updated_values))
+        return hist_dict
+
+
     def build_history(self,reward=None,initial_record=False):
         self.get_account()
         self._portfolio=Portfolio(
@@ -456,7 +547,8 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         data_dict=self.df.iloc[[self._idx]].to_dict('records')[0]
         hist_config.update(data_dict)
         if not initial_record:
-            hist_config={c:hist_config[c] if c in hist_config else None for c in self.historical_info.columns }      
+            hist_config=self.format_history(**hist_config)
+    
         return hist_config
     
     def _load_history(self,position=None):
@@ -515,11 +607,10 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         self._set_df(self.get_data())
         self.get_account()
         self._portfolio  = Portfolio(
-            asset = self.get_balance(self.base_asset),
-            fiat = self.get_balance(self.quote_asset),
-
-        )
-        
+                                    asset = self.get_balance(self.base_asset),
+                                    fiat = self.get_balance(self.quote_asset),
+                                    )
+                                
         
         if self._restore_trading:
             position=None

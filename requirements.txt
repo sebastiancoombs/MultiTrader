@@ -1,0 +1,14 @@
+
+binance-connector
+
+gym-trading-env
+gymnasium
+## ray
+coreforecast==0.0.9
+neuralforecast==1.7.2
+ray[default,rllib]
+IPython
+matplotlib
+gluonts==0.13.2
+tqdm
+numpy==1.23.1
