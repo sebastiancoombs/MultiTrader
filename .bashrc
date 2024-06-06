@@ -10,7 +10,7 @@ build_image &&\
 test_image
 }
 
-function build_and_deploy_image() {
+function deploy_image() {
 
 echo '#######################################'
 echo 'COMPRESSING IMAGE'
@@ -23,8 +23,10 @@ echo 'PUSHING IMAGE TO EC2'
 echo '#######################################'
 
 scp -i aws/ethtrader.pem  "${1:-ethtrader1}".tar.gz ec2-user@ec2-54-242-219-93.compute-1.amazonaws.com:~/
+}
 
 
+function remote_run(){
 ssh -i aws/ethtrader.pem ec2-user@ec2-54-242-219-93.compute-1.amazonaws.com
 
 echo '#######################################'
