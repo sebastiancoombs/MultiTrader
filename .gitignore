@@ -5,7 +5,7 @@ agent/checkpoints/*
 __pycache__
 Keys.py
 *.pem
-.bachrc
+
 *.pyc
 *.pyc
 *.tar
