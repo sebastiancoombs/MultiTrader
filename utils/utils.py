@@ -8,35 +8,7 @@ import matplotlib.pyplot as plt
 import datetime
 from gluonts.time_feature import time_features_from_frequency_str
 
-symbol_map={'ADABNB': 0,
- 'ADABTC': 1,
- 'ADAETH': 2,
- 'ADAUSDT': 3,
- 'BNBETH': 4,
- 'BNBUSDT': 5,
- 'BTCUSDT': 6,
- 'ETHBTC': 7,
- 'ETHUSDT': 8,
- 'SOLBNB': 9,
- 'SOLBTC': 10,
- 'SOLETH': 11,
- 'SOLUSDT': 12,
- 'XRPBNB': 13,
- 'XRPBTC': 14,
- 'XRPETH': 15,
- 'XRPUSDT': 16}
 
-binanace_col_map = {
-                    "t": "date_open",
-                    "T": "date_close",
-                    "s": "symbol",
-                    "o": "open",
-                    "c": "close",
-                    "h": "high",
-                    "l": "low",
-                    "v": "volume",
-                    "x": "is_closed",
-                }
 def preprocess_data(data,time_frame='1h'):
     returns=[2,5,10,15,20,25,30]
     time_funcs=time_features_from_frequency_str(time_frame)

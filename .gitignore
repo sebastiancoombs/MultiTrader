@@ -4,3 +4,11 @@ lightning_logs/*
 agent/checkpoints/*
 __pycache__
 Keys.py
+*.pem
+.bachrc
+*.pyc
+*.pyc
+*.tar
+*.tar.gz
+*.gz
+*.bz2

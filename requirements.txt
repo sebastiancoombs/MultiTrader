@@ -1,14 +1,15 @@
 
 binance-connector
-
-gym-trading-env
+alpaca-py
+gym-trading-env==0.3.3
 gymnasium
 ## ray
 coreforecast==0.0.9
 neuralforecast==1.7.2
 ray[default,rllib]
 IPython
-matplotlib
+matplotlib==3.8.4
+matplotlib-inline==0.1.7
 gluonts==0.13.2
 tqdm
 numpy==1.23.1

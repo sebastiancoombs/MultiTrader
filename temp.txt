@@ -1,0 +1,117 @@
+[    4.343102] systemd[1]: Finished systemd-sysctl.service - Apply Kernel Variables.
+[    4.386150] systemd[1]: Finished systemd-fsck-root.service - File System Check on Root Device.
+[    4.402703] systemd[1]: Started systemd-journald.service - Journal Service.
+[    4.418769] loop: module loaded
+[    4.447406] device-mapper: core: CONFIG_IMA_DISABLE_HTABLE is disabled. Duplicate IMA measurements will not be recorded in the IMA log.
+[    4.456977] device-mapper: uevent: version 1.0.3
+[    4.476029] fuse: init (API version 7.37)
+[    4.479961] device-mapper: ioctl: 4.47.0-ioctl (2022-07-28) initialised: dm-devel@redhat.com
+[    4.499868] systemd-journald[1040]: Received client request to flush runtime journal.
+[    5.075999] vif vif-0 enX0: renamed from eth0
+[    5.088608] input: Power Button as /devices/LNXSYSTM:00/LNXPWRBN:00/input/input0
+[    5.158831] i8042: PNP: PS/2 Controller [PNP0303:PS2K,PNP0f13:PS2M] at 0x60,0x64 irq 1,12
+[    5.166368] serio: i8042 KBD port at 0x60,0x64 irq 1
+[    5.169625] serio: i8042 AUX port at 0x60,0x64 irq 12
+[    5.175887] ACPI: button: Power Button [PWRF]
+[    5.178871] input: Sleep Button as /devices/LNXSYSTM:00/LNXSLPBN:00/input/input1
+[    5.237212] ACPI: button: Sleep Button [SLPF]
+[    5.389376] cryptd: max_cpu_qlen set to 1000
+[    5.444668] zram_generator::config[1824]: zram0: system has too much memory (949MB), limit is 800MB, ignoring.
+[    5.512185] SCSI subsystem initialized
+[    5.567228] AVX2 version of gcm_enc/dec engaged.
+[    5.567252] AES CTR mode by8 optimization enabled
+[    5.607819] libata version 3.00 loaded.
+[    5.614594] ata_piix 0000:00:01.1: version 2.13
+[    5.665935] scsi host0: ata_piix
+[    5.687358] scsi host1: ata_piix
+[    5.687763] ata1: PATA max MWDMA2 cmd 0x1f0 ctl 0x3f6 bmdma 0xc100 irq 14
+[    5.687766] ata2: PATA max MWDMA2 cmd 0x170 ctl 0x376 bmdma 0xc108 irq 15
+[    5.864758] RPC: Registered named UNIX socket transport module.
+[    5.864761] RPC: Registered udp transport module.
+[    5.864761] RPC: Registered tcp transport module.
+[    5.864762] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    7.832280] cloud-init[2104]: Cloud-init v. 22.2.2 running 'init' at Mon, 03 Jun 2024 23:46:40 +0000. Up 7.74 seconds.
+[    7.990131] cloud-init[2104]: ci-info: ++++++++++++++++++++++++++++++++++++++Net device info+++++++++++++++++++++++++++++++++++++++
+[    8.006681] cloud-init[2104]: ci-info: +--------+------+-----------------------------+---------------+--------+-------------------+
+[    8.032082] cloud-init[2104]: ci-info: | Device |  Up  |           Address           |      Mask     | Scope  |     Hw-Address    |
+[    8.050382] cloud-init[2104]: ci-info: +--------+------+-----------------------------+---------------+--------+-------------------+
+[    8.070384] cloud-init[2104]: ci-info: |  enX0  | True |        172.31.29.216        | 255.255.240.0 | global | 0a:ff:f1:23:67:8f |
+[    8.090426] cloud-init[2104]: ci-info: |  enX0  | True | fe80::8ff:f1ff:fe23:678f/64 |       .       |  link  | 0a:ff:f1:23:67:8f |
+[    8.110548] cloud-init[2104]: ci-info: |   lo   | True |          127.0.0.1          |   255.0.0.0   |  host  |         .         |
+[    8.128288] cloud-init[2104]: ci-info: |   lo   | True |           ::1/128           |       .       |  host  |         .         |
+[    8.150378] cloud-init[2104]: ci-info: +--------+------+-----------------------------+---------------+--------+-------------------+
+[    8.180329] cloud-init[2104]: ci-info: ++++++++++++++++++++++++++++++Route IPv4 info++++++++++++++++++++++++++++++
+[    8.203064] cloud-init[2104]: ci-info: +-------+-------------+-------------+-----------------+-----------+-------+
+[    8.230336] cloud-init[2104]: ci-info: | Route | Destination |   Gateway   |     Genmask     | Interface | Flags |
+[    8.250290] cloud-init[2104]: ci-info: +-------+-------------+-------------+-----------------+-----------+-------+
+[    8.270313] cloud-init[2104]: ci-info: |   0   |   0.0.0.0   | 172.31.16.1 |     0.0.0.0     |    enX0   |   UG  |
+[    8.290420] cloud-init[2104]: ci-info: |   1   |  172.31.0.2 | 172.31.16.1 | 255.255.255.255 |    enX0   |  UGH  |
+[    8.302938] cloud-init[2104]: ci-info: |   2   | 172.31.16.0 |   0.0.0.0   |  255.255.240.0  |    enX0   |   U   |
+[    8.322130] cloud-init[2104]: ci-info: |   3   | 172.31.16.1 |   0.0.0.0   | 255.255.255.255 |    enX0   |   UH  |
+[    8.340576] cloud-init[2104]: ci-info: +-------+-------------+-------------+-----------------+-----------+-------+
+[    8.360417] cloud-init[2104]: ci-info: +++++++++++++++++++Route IPv6 info+++++++++++++++++++
+[    8.380322] cloud-init[2104]: ci-info: +-------+-------------+---------+-----------+-------+
+[    8.400315] cloud-init[2104]: ci-info: | Route | Destination | Gateway | Interface | Flags |
+[    8.416631] cloud-init[2104]: ci-info: +-------+-------------+---------+-----------+-------+
+[    8.440270] cloud-init[2104]: ci-info: |   0   |  fe80::/64  |    ::   |    enX0   |   U   |
+[    8.460399] cloud-init[2104]: ci-info: |   2   |    local    |    ::   |    enX0   |   U   |
+[    8.471589] cloud-init[2104]: ci-info: |   3   |  multicast  |    ::   |    enX0   |   U   |
+[    8.490311] cloud-init[2104]: ci-info: +-------+-------------+---------+-----------+-------+
+[   10.191628] cloud-init[2104]: Generating public/private ed25519 key pair.
+[   10.200162] cloud-init[2104]: Your identification has been saved in /etc/ssh/ssh_host_ed25519_key
+[   10.230162] cloud-init[2104]: Your public key has been saved in /etc/ssh/ssh_host_ed25519_key.pub
+[   10.240124] cloud-init[2104]: The key fingerprint is:
+[   10.260139] cloud-init[2104]: SHA256:h1KuBYnefdiRLE1o8JfayOgDkhKLc1WS6ZNafhFTBDA root@ip-172-31-29-216.ec2.internal
+[   10.288930] cloud-init[2104]: The key's randomart image is:
+[   10.294518] cloud-init[2104]: +--[ED25519 256]--+
+[   10.314410] cloud-init[2104]: |    E++=o..      |
+[   10.318205] cloud-init[2104]: |    o=ooo+ o     |
+[   10.321895] cloud-init[2104]: |.  .o.o++ B      |
+[   10.330157] cloud-init[2104]: |.o +=..B X .     |
+[   10.367783] cloud-init[2104]: |= ++o.+.S =      |
+[   10.390604] cloud-init[2104]: | +...o.+ o       |
+[   10.419169] cloud-init[2104]: |     .+          |
+[   10.441291] cloud-init[2104]: |       .         |
+[   10.463155] cloud-init[2104]: |                 |
+[   10.489282] cloud-init[2104]: +----[SHA256]-----+
+[   10.505868] cloud-init[2104]: Generating public/private ecdsa key pair.
+[   10.540622] cloud-init[2104]: Your identification has been saved in /etc/ssh/ssh_host_ecdsa_key
+[   10.602598] cloud-init[2104]: Your public key has been saved in /etc/ssh/ssh_host_ecdsa_key.pub
+[   10.664721] cloud-init[2104]: The key fingerprint is:
+[   10.696541] cloud-init[2104]: SHA256:tS35yKfs50KiRa4IQTOifLIrF/BS7mUel1rsFx+IVlE root@ip-172-31-29-216.ec2.internal
+[   10.731485] cloud-init[2104]: The key's randomart image is:
+[   10.770543] cloud-init[2104]: +---[ECDSA 256]---+
+[   10.781939] cloud-init[2104]: |         .E      |
+[   10.870353] cloud-init[2104]: |. +     .        |
+[   10.890520] cloud-init[2104]: |oo o     ..      |
+[   10.910121] cloud-init[2104]: |ooo.    o. +     |
+[   10.920618] cloud-init[2104]: | =+. . *S.+ .    |
+[   10.950291] cloud-init[2104]: |..= + B *.o+     |
+[   10.986545] cloud-init[2104]: | o.* O + =o.o    |
+[   11.010202] cloud-init[2104]: |..o + + ..oo.    |
+[   11.050113] cloud-init[2104]: |..     . .++.    |
+[   11.056509] cloud-init[2104]: +----[SHA256]-----+
+[   11.642624] cloud-init[2244]: Cloud-init v. 22.2.2 running 'modules:config' at Mon, 03 Jun 2024 23:46:44 +0000. Up 11.45 seconds.
+[   12.872334] cloud-init[2254]: Cloud-init v. 22.2.2 running 'modules:final' at Mon, 03 Jun 2024 23:46:45 +0000. Up 12.74 seconds.
+ci-info: ++++++++++++++++++++++++++++Authorized keys from /home/ec2-user/.ssh/authorized_keys for user ec2-user+++++++++++++++++++++++++++++
+ci-info: +---------+-------------------------------------------------------------------------------------------------+---------+-----------+
+ci-info: | Keytype |                                       Fingerprint (sha256)                                      | Options |  Comment  |
+ci-info: +---------+-------------------------------------------------------------------------------------------------+---------+-----------+
+ci-info: | ssh-rsa | fb:05:f9:a6:e0:03:3d:98:49:11:4b:33:c4:6c:6c:79:e1:8d:39:30:ab:76:c0:0b:c5:06:7c:77:7a:b3:af:35 |    -    | ethtrader |
+ci-info: +---------+-------------------------------------------------------------------------------------------------+---------+-----------+
+<14>Jun  3 23:46:46 cloud-init: #############################################################
+<14>Jun  3 23:46:46 cloud-init: -----BEGIN SSH HOST KEY FINGERPRINTS-----
+<14>Jun  3 23:46:46 cloud-init: 256 SHA256:tS35yKfs50KiRa4IQTOifLIrF/BS7mUel1rsFx+IVlE root@ip-172-31-29-216.ec2.internal (ECDSA)
+<14>Jun  3 23:46:46 cloud-init: 256 SHA256:h1KuBYnefdiRLE1o8JfayOgDkhKLc1WS6ZNafhFTBDA root@ip-172-31-29-216.ec2.internal (ED25519)
+<14>Jun  3 23:46:46 cloud-init: -----END SSH HOST KEY FINGERPRINTS-----
+<14>Jun  3 23:46:46 cloud-init: #############################################################
+-----BEGIN SSH HOST KEY KEYS-----
+ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBIaI9S6soXa6QOpCnDYZCY/zjrsvxBtl2POe0ZtEEuYk6LoDY9bdJWX3FeE0aDoZ3iEZxA7qhO+tOItSZfLhhW4= root@ip-172-31-29-216.ec2.internal
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA5mzvaAVIEYkAERc/7SZ7qnDtQMXtBb/kPUnsMb+Uug root@ip-172-31-29-216.ec2.internal
+-----END SSH HOST KEY KEYS-----
+[   13.414629] cloud-init[2254]: Cloud-init v. 22.2.2 finished at Mon, 03 Jun 2024 23:46:46 +0000. Datasource DataSourceEc2.  Up 13.39 seconds
+
+Amazon Linux 2023.4.20240528
+Kernel 6.1.91-99.172.amzn2023.x86_64 on an x86_64 (-)
+
+ip-172-31-29-216 login: 
