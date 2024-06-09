@@ -17,3 +17,4 @@ __pycache__/
 *.tar.gz
 *.gz
 *.bz2
+*.zip

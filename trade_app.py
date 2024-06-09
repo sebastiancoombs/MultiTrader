@@ -9,11 +9,11 @@ import pandas as pd
 import pytorch_lightning
 from alpaca.data.live.crypto import CryptoDataStream
 from binance.websocket.spot.websocket_stream import SpotWebsocketStreamClient
-from environments.live_environments import AlpacaTradingEnv, LiveTradingEnv
+from environments.live_environments import AlpacaTradingEnv
 from Keys import *
 from neuralforecast.core import NeuralForecast
 from ray.rllib.policy.policy import Policy
-from utils.rendering import LiveRenderer
+
 from utils.utils import sharpe_reward
 
 pytorch_lightning._logger.setLevel(0)

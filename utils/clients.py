@@ -110,7 +110,7 @@ class AlpacaClient():
     def update_account(self):
         self.update_positions()
         account_obj=self.trade_client.get_account()
-        account=account_obj.model_dump()
+        account=account_obj.dict()
         pos_frame=self._positions
         asset_quanities=pos_frame['qty_available'].to_dict()
         account.update(asset_quanities)
@@ -123,14 +123,14 @@ class AlpacaClient():
     
     def update_positions(self):
         positions = self.trade_client.get_all_positions()
-        position_list=[p.model_dump() for p in positions]
+        position_list=[p.dict() for p in positions]
         pos_frame=pd.DataFrame.from_dict(position_list).set_index('symbol')
         
         self._positions=pos_frame
     
     def get_trade_rules(self):
         trade_info=self.trade_client.get_asset(self.symbol)
-        trade_info=trade_info.model_dump()
+        trade_info=trade_info.dict()
         trade_rules=dict(
                         min_quote_size=1,
                         max_quote_size=1_000_000,
