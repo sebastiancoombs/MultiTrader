@@ -15,6 +15,8 @@ from utils.mappings import binanace_col_map, symbol_map,alpaca_stream_col_map,al
 
 from utils.clients import AlpacaClient
 from .environments import NeuralForecastingTradingEnv
+from statsforecast import StatsForecast
+
 
 
 class LiveTradingEnv(NeuralForecastingTradingEnv):
@@ -29,6 +31,7 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
             streaming=False,
             history_path='Trade_history/trade.db',
             agent=None,
+            render_forecasts=False,
             *args,
             **kwargs,
             ):
@@ -45,7 +48,8 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         self._restore_trading=restore_trading
         self._history_path=history_path
         self.time_frame=time_frame
-
+        
+        self.render_forecasts=render_forecasts
         self.conn = db.connect(history_path)
 
         self.agent=agent
@@ -156,10 +160,15 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         self.historical_info.add(**hist_config)
         self._save_history()
                 
+        self.set_forecast_df()
+
+        return self._get_obs(),  self.historical_info["reward", -1], done, truncated, self.historical_info[-1]
+    
+    def set_forecast_df(self):
         self._set_df(self.get_data())
         self._prep_forecasts()
         self._set_df(self.get_data())
-        return self._get_obs(),  self.historical_info["reward", -1], done, truncated, self.historical_info[-1]
+        
 
     def update_portfolio(self):
         self.account=self.get_account()
@@ -745,14 +754,12 @@ class AlpacaTradingEnv(LiveTradingEnv):
     
     def live_trade(self):
         
-        data=self.get_data()
-        self._set_df(data)
-        self._prep_forecasts()
-        self._set_df(data)
+        self.set_forecast_df()
         obs = self._get_obs()
         action,_,states=self.agent.compute_single_action(obs,explore=False)
         obs, reward, terminated, truncated, info=self.live_step(action,wait=False)
 
+    
     async def _live_stream_data_handler(self,message):
 
             do_trade=False
@@ -803,7 +810,10 @@ class AlpacaTradingEnv(LiveTradingEnv):
 
         if do_trade:
             self.loading_bar=tqdm(range(wait_time),desc=f'Next trade at {wait_str}',leave=True)
-            self.live_trade()
+            # self.live_trade()
+            if self.render_forecasts:
+                print(self.pred_df)
+                
 
         else:
             self.loading_bar.set_description(f'Next trade at {wait_str} {wait_time} minutes:')

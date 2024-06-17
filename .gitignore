@@ -4,8 +4,9 @@ lightning_logs/*
 agent/checkpoints/*
 __pycache__
 Keys.py
+.DS_Store
 *.pem
-
+*.code-workspace
 *.pyc
 *.pyc
 *.tar

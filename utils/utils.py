@@ -3,7 +3,7 @@ import pandas as pd
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
-
+from .mappings import *
 
 import datetime
 from gluonts.time_feature import time_features_from_frequency_str
@@ -138,3 +138,21 @@ def sharpe_reward(history):
     reward = (portfolio_pct_change.mean() / portfolio_pct_change.std())
     reward = 0 if np.isnan(reward) else reward
     return float(reward)
+
+def prep_forecasts(df:pd.DataFrame,model):
+    forecast_array=[]
+    # print(self.df.columns)
+
+    model.dataset, model.uids, model.last_dates, model.ds=model._prepare_fit(df[['ds','unique_id','y']],
+                                                                                        static_df=None, 
+                                                                                        sort_df=None,
+                                                                                        predict_only=False,
+                                                                                        id_col='unique_id', 
+                                                                                        time_col='ds', 
+                                                                                        target_col='y')
+    forecasts=model.predict_insample()
+    forecasts_series=forecasts.groupby('cutoff').apply(lambda x: x.select_dtypes(np.number).values.flatten())
+    new_df=df[df['ds'].isin([c for c in forecasts_series.index])]
+    forecasts_series=forecasts_series[new_df.index]
+    forecast_array=[c for c in forecasts_series]
+    return forecast_array,new_df

@@ -45,6 +45,7 @@ class NeuralForecastingTradingEnv(TradingEnv):
                 )
         self._original_obs=super()._get_obs
         self.model=model
+        self.pred_df=None
 
         if forecasts:
             pre_prepped=True
@@ -92,6 +93,8 @@ class NeuralForecastingTradingEnv(TradingEnv):
                                                                                             time_col='ds', 
                                                                                             target_col='y')
         forecasts=self.model.predict_insample()
+        self.pred_df=self.model.predict(self.df[['ds','unique_id','y']])
+        
         forecasts_series=forecasts.groupby('cutoff').apply(lambda x: x.select_dtypes(np.number).values.flatten())
         forecast_array=[c for c in forecasts_series]
         self._forecast_array=forecast_array
