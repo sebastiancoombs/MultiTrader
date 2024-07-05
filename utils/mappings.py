@@ -25,9 +25,23 @@ symbol_map={'ADABNB': 0,
  'XRPETH': 15,
  'XRPUSDT': 16,
  'XRPUSD': 16,
+'EUR_USD': 17,
+'EURUSD': 17,
+ 'AUD_USD': 18,
+ 'AUDUSD': 18,
+ 'GBP_USD': 19,
+ 'GBPUSD': 19,
+ 'USD_JPY': 20,
+ 'USDJPY': 20,
+ 'NZD_USD': 21,
+ 'NZDUSD': 21,
+ 'USD_CAD': 22,
+ 'USDCAD': 22,
+ 'USD_CHF': 23,
+ 'USDCHF': 23,
+ 'USD_MXN': 24,
+ 'USDMXN': 24,
  }
-
-
 
 binanace_col_map = {
                     "t": "date_open",
@@ -55,4 +69,9 @@ alpaca_stream_message_map={
 alpaca_time_map={
     '1h':TimeFrame.Hour,
     '1d':TimeFrame.Day,
+}
+
+oanda_time_map={
+    '1h':'H1',
+    '1d':'D1',
 }

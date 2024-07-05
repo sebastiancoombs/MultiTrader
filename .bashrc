@@ -1,8 +1,21 @@
-function clean_docker() {docker system prune --all --volumes --force;}
+function decomp() {
+    tar -xzvf "${1:-MultiTrader}".tar
 
-function build_image() {docker build --platform=linux/amd64  -t "${1:-ethtrader1}" .; }
-function test_image() {docker run -p 5000:5000 "${1:-ethtrader1}" ; }
-alias connect_ec2="ssh -i aws/ethtrader.pem ec2-user@ec2-54-242-219-93.compute-1.amazonaws.com"
+}
+
+function clean_docker() {
+    docker system prune --all --volumes --force ;
+}
+
+function build_image() {
+    docker build --platform=linux/amd64  -t "${1:-ethtrader1}" . ; 
+    }
+function test_image() {
+    docker run -p 5000:5000 "${1:-ethtrader1}" ; 
+    }
+
+alias connect_ec2="ssh -i aws/FX_trader.pem ec2-user@ec2-34-228-167-95.compute-1.amazonaws.com
+"
 
 function clean_build_test() {
 clean_docker &&\
@@ -16,34 +29,46 @@ echo '#######################################'
 echo 'COMPRESSING IMAGE'
 echo '#######################################'
 
-docker save  "${1:-ethtrader1}":latest | gzip >  "${1:-ethtrader1}".tar.gz 
+docker save  "${1:-ethtrader1}":bin/bashlatest | gzip >  "${1:-ethtrader1}".tar.gz 
 
 echo '#######################################'
 echo 'PUSHING IMAGE TO EC2'
 echo '#######################################'
 
-scp -i aws/ethtrader.pem  "${1:-ethtrader1}".tar.gz ec2-user@ec2-54-242-219-93.compute-1.amazonaws.com:~/
+scp -i aws/FX_trader.pem  "${1:-ethtrader1}".tar.gz ec2-user@ec2-34-228-167-95.compute-1.amazonaws.com
+:~/
 }
 
 
 function remote_run(){
-ssh -i aws/ethtrader.pem ec2-user@ec2-54-242-219-93.compute-1.amazonaws.com
+ssh -i aws/FX_trader.pem ec2-user@ec2-34-228-167-95.compute-1.amazonaws.com
+
 
 echo '#######################################'
 echo 'DEPLOYING IMAGE'
 echo '#######################################'
 
 docker load <  "${1:-ethtrader1}".tar.gz
+docker load <  jpy_trader.tar.gz
 
 echo '#######################################'
 echo 'RUNNING IMAGE'
 echo '#######################################'
 # sudo cat ethtrader1.bz2 | sudo docker load
 sudo docker run -p 5000:5000  "${1:-ethtrader1}"
+docker load <  jpy_trader.tar.gz
+docker run -p 5000:5000 jpy_trader
 }
 
-## push image to lightsail
-aws lightsail push-container-image --service-name livetrading-service --label ethtrader1  --image ethtrader1
+# ## push image to lightsail
+# aws lightsail push-container-image --service-name livetrading-service --label ethtrader1  --image ethtrader1
 
-## deploy on light sail 
-aws lightsail create-container-service-deployment --service-name livetrading-service --containers file://aws/containers.json --public-endpoint file://aws/public-endpoint.json
+# ## deploy on light sail 
+# aws lightsail create-container-service-deployment --service-name livetrading-service --containers file://aws/containers.json --public-endpoint file://aws/public-endpoint.json
+
+# tar -czvf MultiTrader.tar --no-xattrs --exclude-from=ignore.txt . 
+
+# tar -xzvf MultiTrader.tar --exclude-from=ignore.txt . 
+
+# scp -i aws/FX_trader.pem  MultiTrader.tar ec2-user@ec2-54-242-219-93.compute-1.amazonaws.com:~/
+# docker build -t fx_trader .

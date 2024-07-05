@@ -32,6 +32,7 @@ class BoxTradingEnv(TradingEnv):
 class NeuralForecastingTradingEnv(TradingEnv):
     def __init__(self,model=None,forecasts=None,forecast_horizon=7,context_length=35,pre_prep=True,*args,**kwargs):
         warnings.filterwarnings("ignore")
+        warnings.simplefilter('ignore')
         super().__init__(*args,**kwargs)
         self.add_metric('Position Changes', lambda history : np.sum(np.diff(history['position']) != 0) )
         self.add_metric('Episode Length', lambda history : len(history['position']) )
@@ -74,6 +75,7 @@ class NeuralForecastingTradingEnv(TradingEnv):
                 shape = [self._nb_features+len(forecast)]
             )
         
+        warnings.filterwarnings('ignore')
     
     def _get_obs(self):
         feature_obs= self._original_obs()

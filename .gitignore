@@ -1,9 +1,13 @@
 
 *.json
 lightning_logs/*
-agent/checkpoints/*
+Agent/*
+data/*
+data_forex/*
+
 __pycache__
 Keys.py
+PPO_2024*
 .DS_Store
 *.pem
 *.code-workspace

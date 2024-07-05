@@ -44,7 +44,7 @@ def preprocess_data(data,time_frame='1h'):
         data[f'feature_log_volume_{r}'] = np.log(1 + data.volume.pct_change(r)+1e-15)
 
     data = data.replace((np.inf, -np.inf,np.nan), 0)
-    data=data-data.min(0)/(data.max(0)-data.min(0))
+    # data=data-data.min(0)/(data.max(0)-data.min(0))
     data['ds']=data.index.values
     data['ds']=data['ds'].apply(pd.Timestamp)
     return data
@@ -103,9 +103,9 @@ def stack_arrays(data,name=None,n_samples=24,prediction_window=4,feature_id=1):
 
     return train_list,val_list
 
-def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1):
+def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1,dir='data'):
 
-    files=glob.glob(f'data/**{time_frame}.pkl',recursive=True)
+    files=glob.glob(f'{dir}/**{time_frame}.pkl',recursive=True)
     # print(files)
     big_data=[]
     
@@ -139,6 +139,8 @@ def sharpe_reward(history):
     reward = 0 if np.isnan(reward) else reward
     return float(reward)
 
+
+
 def prep_forecasts(df:pd.DataFrame,model):
     forecast_array=[]
     # print(self.df.columns)
@@ -156,3 +158,4 @@ def prep_forecasts(df:pd.DataFrame,model):
     forecasts_series=forecasts_series[new_df.index]
     forecast_array=[c for c in forecasts_series]
     return forecast_array,new_df
+
