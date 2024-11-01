@@ -47,7 +47,7 @@ live_env_config=dict(
                 target_symbol=trade_target,
                 time_frame=trade_interval,
                 reward_function=sharpe_reward,
-                positions = [ -.5,-.25,.25, .5], # -1 (=SHORT), 0(=OUT), +1 (=LONG)
+                positions = [-1,0,1], # -1 (=SHORT), 0(=OUT), +1 (=LONG)
                 trading_fees = 0.01/100, # 0.01% per stock buy / sell (Binance fees)
                 borrow_interest_rate= 0.0003/100, # 0.0003% per timestep (one timestep = 1h here)
                 max_episode_duration=168,

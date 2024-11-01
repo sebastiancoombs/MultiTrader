@@ -10,16 +10,16 @@ from binance.spot import Spot
 from gym_trading_env.utils.history import History
 from gym_trading_env.utils.portfolio import Portfolio
 from tqdm.asyncio import tqdm
-from utils.utils import preprocess_data
+from utils.utils import preprocess_data,sharpe_reward, build_market_image,prepare_forecast_data
 from utils.mappings import binanace_col_map, symbol_map,alpaca_stream_col_map,alpaca_stream_message_map
 
 from utils.clients import AlpacaClient
-from .environments import NeuralForecastingTradingEnv
-from statsforecast import StatsForecast
+from .environments import NeuralForecastingTradingEnv,NormTradingEnvironment
 
 
 
-class LiveTradingEnv(NeuralForecastingTradingEnv):
+
+class LiveTradingEnv(NormTradingEnvironment):
     def __init__(
             self,
             api_key,
@@ -32,12 +32,15 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
             history_path='Trade_history/trade.db',
             agent=None,
             render_forecasts=False,
+            forecast_model=None,
             *args,
             **kwargs,
             ):
         self.api_key=api_key
         self.api_secret=api_secret
-        self.context_length=kwargs['model'].models[0].input_size
+        self.context_length=forecast_model.models[0].input_size
+        self.forecast_model=forecast_model
+
         kwargs['max_episode_duration']=self.context_length
         self.live_history=pd.DataFrame(columns=[
             'portfolio_valuation',
@@ -62,6 +65,7 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         self.quote_asset_precision=None
         self.base_asset_precision=None
         self.loading_bar=None
+    
 
         self.action_map={x:pct for x,pct in enumerate(kwargs['positions'])}
         self.side_map={-1:'SELL',1:'BUY',0:'close'}
@@ -292,8 +296,8 @@ class LiveTradingEnv(NeuralForecastingTradingEnv):
         else:
             data = self.get_klines()
             
-
         data=self._preprocess_data(data)
+        data=prepare_forecast_data(model=self.forecast_model,df=data)
 
         data['ds']=data.index.copy()
         data['symbol'] = self.symbol

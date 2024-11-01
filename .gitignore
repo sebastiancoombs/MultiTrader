@@ -13,3 +13,4 @@ Keys.py
 *.tar.gz
 *.gz
 *.bz2
+*.pyc
