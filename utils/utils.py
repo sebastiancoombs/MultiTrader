@@ -81,6 +81,7 @@ def preprocess_data(data,indicators=['RSI','MACD','STOCH',"BBANDS"],time_frame='
 
     data = data.replace((np.inf, -np.inf,np.nan), 0)
     # data=data-data.min(0)/(data.max(0)-data.min(0))
+    # data=data-data.min(0)/(data.max(0)-data.min(0))
     data['ds']=data.index.values
     data['ds']=data['ds'].apply(pd.Timestamp)
     return data
@@ -139,8 +140,11 @@ def stack_arrays(data,name=None,n_samples=24,prediction_window=4,feature_id=1):
 
     return train_list,val_list
 
+def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1,dir='data'):
 def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1,verbose=1,only_target=False,indicators=['RSI','MACD','STOCH',"BBANDS"]):
 
+    files=glob.glob(f'{dir}/**{time_frame}.pkl',recursive=True)
+    # print(files)
     files=glob.glob(f'data/**{time_frame}.pkl',recursive=True)
     if only_target:
         files=[f for f in files if target_pair.replace('/','') in f]
@@ -180,6 +184,8 @@ def sharpe_reward(history):
     reward = 0 if np.isnan(reward) else reward
     return float(reward)
 
+
+
 def prep_forecasts(df:pd.DataFrame,model):
     forecast_array=[]
     # print(self.df.columns)
@@ -197,6 +203,8 @@ def prep_forecasts(df:pd.DataFrame,model):
     forecasts_series=forecasts_series[new_df.index]
     forecast_array=[c for c in forecasts_series]
     return forecast_array,new_df
+
+
 
 def flatten_preds(idx,cut_data,horizon=4):
     t_off_pred,symb=idx

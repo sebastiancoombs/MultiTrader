@@ -2,9 +2,10 @@ import datetime
 import json
 import sqlite3 as db
 import time
-
+import re
 import alpaca
 import numpy as np
+import oandapyV20.endpoints.pricing as pricing
 import pandas as pd
 from binance.spot import Spot
 from gym_trading_env.utils.history import History
@@ -23,7 +24,7 @@ class LiveTradingEnv(NormTradingEnvironment):
     def __init__(
             self,
             api_key,
-            api_secret,
+            api_secret=None,
             test_net=True,
             time_frame='1h',
             target_symbol='ETH/USDT',
@@ -32,6 +33,7 @@ class LiveTradingEnv(NormTradingEnvironment):
             history_path='Trade_history/trade.db',
             agent=None,
             render_forecasts=False,
+            onnx_model=False,
             forecast_model=None,
             *args,
             **kwargs,
@@ -47,6 +49,7 @@ class LiveTradingEnv(NormTradingEnvironment):
             'position',
             
             ])
+        self.onnx_model=onnx_model
         self._streaming=streaming
         self._restore_trading=restore_trading
         self._history_path=history_path
@@ -70,9 +73,9 @@ class LiveTradingEnv(NormTradingEnvironment):
         self.action_map={x:pct for x,pct in enumerate(kwargs['positions'])}
         self.side_map={-1:'SELL',1:'BUY',0:'close'}
         self.test_net=test_net
-  
-        self.quote_asset=target_symbol.split('/')[-1]
-        self.base_asset=target_symbol.split('/')[0]
+        symbol_split=re.split('/|_|-', target_symbol)
+        self.quote_asset=symbol_split[-1]
+        self.base_asset=symbol_split[0]
         self.symbol=''.join([self.base_asset,self.quote_asset])
         self._rew=0
         self._current_valuation=0
@@ -165,6 +168,10 @@ class LiveTradingEnv(NormTradingEnvironment):
         self._save_history()
                 
         self.set_forecast_df()
+        obs=self._get_obs()
+        print(self.pred_df.tail(1))
+        print(self.df.tail(1))
+        # display(obs)
 
         return self._get_obs(),  self.historical_info["reward", -1], done, truncated, self.historical_info[-1]
     
@@ -173,7 +180,6 @@ class LiveTradingEnv(NormTradingEnvironment):
         self._prep_forecasts()
         self._set_df(self.get_data())
         
-
     def update_portfolio(self):
         self.account=self.get_account()
         base_balance=self.get_balance(self.base_asset)
@@ -203,7 +209,9 @@ class LiveTradingEnv(NormTradingEnvironment):
         if position != self._position:
             self._trade(position)
         else:
-            print('stay in position')
+            self.update_portfolio()        
+            current_portfolio=self._portfolio.get_portfolio_distribution()
+            print(f'{position} stay in position: {current_portfolio}')
             
     def _trade(self, position, price = None):
         self.account=self.get_account()
@@ -241,12 +249,12 @@ class LiveTradingEnv(NormTradingEnvironment):
             }
         
         if side_str.upper()=='BUY':
-            dollar_val=np.abs(position_change)*n_dollars
+            dollar_val=abs(position_change)*n_dollars
             asset_size=n_dollars/price
             trade_size=self.normalize_quote_size(dollar_val)
 
         elif side_str.upper()=='SELL':
-            asset_size=np.abs(position_change)*n_asset
+            asset_size=abs(position_change)*n_asset
             dollar_val=asset_size*price
             trade_size=self.normalize_quote_size(dollar_val)
 
@@ -303,12 +311,12 @@ class LiveTradingEnv(NormTradingEnvironment):
         data['symbol'] = self.symbol
         data['unique_id']=symbol_map[self.symbol]
         data['is_closed']=True
-        conn=self.connect_to_db()
-        if initial_pull:
-            data['bar_type']='Bar'
-            data.to_sql(f'{self.symbol}_candle_history',conn,if_exists='replace',index=True)
-        data=data.drop(['is_closed'],axis=1)
-        conn.close()
+        with self.connect_to_db() as conn:
+            if initial_pull:
+                data['bar_type']='Bar'
+                data.to_sql(f'{self.symbol}_candle_history',conn,if_exists='replace',index=True)
+            data=data.drop(['is_closed'],axis=1)
+
 
         return data
     
@@ -379,22 +387,6 @@ class LiveTradingEnv(NormTradingEnvironment):
             print(e)
             return False
         
-    def stream_step(self,socket_manager,message):
-
-        do_trade=self._stream_data_handler(message)
-        if do_trade:
-            listen_key=self.client.renew_listen_key(self._listen_key)
-            print(listen_key)
-            data=self.get_data()
-
-            self._set_df(data)
-            self._prep_forecasts()
-            self._set_df(data)
-
-            obs = self._get_obs()
-            action,_,states=self.agent.compute_single_action(obs,explore=False)
-            obs, reward, terminated, truncated, info=self.live_step(action,wait=False)
-
     def wait_for_reward(self):
         self.client=self.connect_client()
         current_time=pd.Timestamp(datetime.datetime.now())
@@ -638,7 +630,6 @@ class AlpacaTradingEnv(LiveTradingEnv):
         
         super().__init__(**kwargs)
     
-
     def connect_client(self):
         if self.client!=None:
             del self.client
@@ -719,12 +710,12 @@ class AlpacaTradingEnv(LiveTradingEnv):
             }
 
         if side_str.upper()=='BUY':
-            dollar_val=np.abs(position_change)*n_dollars
+            dollar_val=abs(position_change)*n_dollars
             asset_size=n_dollars/price
-            trade_size=self.normalize_quote_size(dollar_val)
+            trade_size=self.normalize_asset_size(asset_size)
 
         elif side_str.upper()=='SELL':
-            asset_size=np.abs(position_change)*n_asset
+            asset_size=abs(position_change)*n_asset
             dollar_val=asset_size*price
             trade_size=self.normalize_quote_size(dollar_val)
         else:
@@ -760,9 +751,22 @@ class AlpacaTradingEnv(LiveTradingEnv):
         
         self.set_forecast_df()
         obs = self._get_obs()
-        action,_,states=self.agent.compute_single_action(obs,explore=False)
+        if self. onnx_model:
+            action=self.onnx_infer(obs)        
+        else:    
+            action,_,states=self.agent.compute_single_action(obs,explore=False)
         obs, reward, terminated, truncated, info=self.live_step(action,wait=False)
 
+    def onnx_infer(self,obs):
+        states=np.zeros(1,dtype=np.float32)
+        input_dict={'obs': np.array([obs]),'state_ins':states}
+
+        outputs = self.agent.run(None,input_dict)
+        states=outputs[-1]
+        action_proba=outputs[0]
+        print(action_proba)
+        action = int(np.argmax(action_proba))
+        return action
     
     async def _live_stream_data_handler(self,message):
 
@@ -814,7 +818,7 @@ class AlpacaTradingEnv(LiveTradingEnv):
 
         if do_trade:
             self.loading_bar=tqdm(range(wait_time),desc=f'Next trade at {wait_str}',leave=True)
-            # self.live_trade()
+            self.live_trade()
             if self.render_forecasts:
                 print(self.pred_df)
                 
@@ -823,3 +827,177 @@ class AlpacaTradingEnv(LiveTradingEnv):
             self.loading_bar.set_description(f'Next trade at {wait_str} {wait_time} minutes:')
             self.loading_bar.update(1)
         
+
+class OandaTradingEnv(AlpacaTradingEnv):
+    def __init__(
+            self,
+            account_id=None,
+            *args,
+            **kwargs,
+            ):
+        
+        self.account_id=account_id
+        
+        super().__init__(**kwargs)
+        self.symbol='_'.join([self.base_asset,self.quote_asset])
+
+    def connect_client(self):
+        if self.client!=None:
+            del self.client
+
+        client=OandaClient(api_key=self.api_key,
+                            account_id=self.account_id,
+                        
+                            paper=self.test_net,
+                            symbol='_'.join([self.base_asset,self.quote_asset]),
+                            time_frame=self.time_frame)
+
+        return client
+    
+    def _get_price(self):
+        symb='_'.join([self.base_asset,self.quote_asset])
+        price=float(self.client.ticker_price(symb))
+        self._current_price=price
+        return price
+    
+    def _trade(self, position, price = None):
+        self.account=self.get_account()
+        ## get size of assets we have
+        n_dollars=float(self.client._account['cash'])
+
+        price=self._get_price()
+        new_position=position
+    
+        trade_from_to=[self._position,new_position]
+        position_change=np.diff([trade_from_to])
+        position_change=round(float(position_change),2)
+
+        print('--------------- TRADE ------------------')
+        ## decide which direction to go
+        side=np.sign(position_change)
+        side_str=self.side_map[side]
+        self.update_portfolio()
+        
+        current_portfolio=self._portfolio.get_portfolio_distribution()
+        current_portfolio['valuation']=self._portfolio.valorisation(price)
+        symbol='_'.join([self.base_asset,self.quote_asset])
+
+        params = {
+            'symbol': symbol,
+            'side': side_str,
+            'type': 'MARKET',
+            'time_in_force': 'ioc',
+
+            }
+        print('Position_change',position_change)
+
+        dollar_val=abs(position_change)*n_dollars
+        
+        asset_size=dollar_val*price
+        dollar_val=self.normalize_quote_size(dollar_val)
+        trade_size=self.normalize_asset_size(asset_size)
+
+        params['notional']=round(dollar_val,0)
+        
+        print('portfoliio',current_portfolio)
+
+        print(f'''
+              Trade {trade_from_to[0]}->{trade_from_to[1]} \n
+              so {side_str} {dollar_val} {self.base_asset} units or \n
+              {trade_size} {self.quote_asset} 
+              at {price} {self.quote_asset} per {self.base_asset}
+            '''
+              )
+        
+        print(params)
+        try: 
+            self.client.new_order(**params)
+        except Exception as e:
+            print(e)
+        self.update_portfolio()
+        self._position = position
+        return
+    
+    def get_trade_params(self):
+        pass
+
+
+    def reset_account(self):
+        self.client.update_positions()
+        pos_frame=self.client._positions
+        print(pos_frame)
+        for symbol,row in pos_frame.iterrows():
+
+            dump_size=abs(float(row['units']))
+            side=row['side']
+
+            
+            params = {
+                'symbol': self.symbol,
+                'type': 'MARKET',
+                'notional':dump_size,
+                # 'quantity':trade_size,
+                }
+            if side.upper()=='SELL':
+                params['side']='BUY'
+
+            if side.upper()=='BUY':
+                params['side']='SELL'   
+
+            print('reset_account')
+            print(params)
+
+            self.client.new_order(**params)
+
+    def close_positions(self):
+        ## close all positions
+        self.reset_account()
+
+    def get_klines(self):
+
+
+        data=self.client.klines(self.symbol, self.time_frame, limit=self.context_length*2)
+        data['date_close']=data['date_close'].apply(pd.to_datetime)
+
+        data=data.set_index('date_close')
+        data=data[['open','high','low','close','volume']]
+        return data
+    
+    def stream_trade(self):
+        r = pricing.PricingStream(accountID=self.client.account_id, params={"instruments": "_".join([self.base_asset,self.quote_asset])})
+        while True:
+            first_tick=0
+            try:
+                # the stream requests returns a generator so we can do ...
+                for tick in self.client.api.request(r):
+                    time_stamp=pd.Timestamp(tick['time'])
+                    if time_stamp.minute==0:
+                        if first_tick==0:
+                            self.live_trade()
+                            first_tick+=1
+                            self.update_loading_bar(reset=True)
+                        else:
+                            self.update_loading_bar(reset=False)
+                    else:
+                        first_tick=0
+                        self.update_loading_bar(reset=False)
+            except StreamTerminated as err:
+                print(f"Stream processing ended because {err} ")
+
+    def update_loading_bar(self, reset=False):
+        now = pd.Timestamp.now()
+
+        # Round the timestamp to the nearest hour
+        next_hour = now.floor(self.time_frame) + pd.Timedelta(self.time_frame)
+        wait_time=(next_hour-now).total_seconds()
+        wait_time=int(wait_time)
+        wait_str=next_hour.strftime('%I:%M %p %m-%d-%Y')
+        if not isinstance(self.loading_bar,tqdm):
+            self.loading_bar=tqdm(range(wait_time),desc=f'Next trade at {wait_str}',leave=True)
+        
+        if reset:
+            self.loading_bar=tqdm(range(wait_time),desc=f'Next trade at {wait_str}',leave=True)
+
+        self.loading_bar.update(1)
+        if self.loading_bar.total==self.loading_bar.n:
+            self.loading_bar.reset()

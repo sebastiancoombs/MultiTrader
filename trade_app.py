@@ -9,7 +9,7 @@ import pandas as pd
 import pytorch_lightning
 from alpaca.data.live.crypto import CryptoDataStream
 from binance.websocket.spot.websocket_stream import SpotWebsocketStreamClient
-from environments.live_environments import AlpacaTradingEnv
+from environments.live_environments import AlpacaTradingEnv,OandaTradingEnv
 from Keys import *
 from neuralforecast.core import NeuralForecast
 from ray.rllib.policy.policy import Policy
@@ -31,7 +31,7 @@ history_path='Trade_history/trade.db'
 
 conn=db.connect(history_path)
 
-model=NeuralForecast.load("forecasting_model",verbose=False)
+model=NeuralForecast.load("FX_forecasting_model",verbose=False)
 
 agent_dir='Agent/final_checkpoints/policies/default_policy'
 agent= Policy.from_checkpoint(agent_dir)
@@ -54,7 +54,7 @@ live_env_config=dict(
                 verbose=0,
                 )
 
-live_env=AlpacaTradingEnv(**live_env_config)
+live_env=OandaTradingEnv(**live_env_config)
 obs,info=live_env.reset(reset_account=True)
 time_format='%I:%M %p %m-%d-%Y'
                         
