@@ -13,6 +13,13 @@ function build_image() {
 function test_image() {
     docker run -p 5000:5000 "${1:-ethtrader1}" ; 
     }
+function tag_and_push() {
+    docker tag "${1:-ethtrader1}" 905418441144.dkr.ecr.us-east-1.amazonaws.com/metalocal/${1:-ethtrader1}:latest ;
+    docker push 905418441144.dkr.ecr.us-east-1.amazonaws.com/metalocal/${1:-ethtrader1}:latest;
+    }
+docker tag doge_trader:latest 905418441144.dkr.ecr.us-east-1.amazonaws.com/metalocal/doge_trader:latest
+docker push 905418441144.dkr.ecr.us-east-1.amazonaws.com/metalocal/doge_trader:latest;
+
 
 alias connect_ec2="ssh -i aws/FX_trader.pem ec2-user@ec2-34-228-167-95.compute-1.amazonaws.com
 "
@@ -20,9 +27,13 @@ alias connect_ec2="ssh -i aws/FX_trader.pem ec2-user@ec2-34-228-167-95.compute-1
 function clean_build_test() {
 clean_docker &&\
 build_image &&\
-test_image
-}
+test_image &&\
 
+}
+function build_deploy() {
+clean_build_test &&\
+tag_and_push
+}
 function deploy_image() {
 
 echo '#######################################'

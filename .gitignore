@@ -1,7 +1,7 @@
 
 *.json
 lightning_logs/*
-Agent/*
+# Agent/*
 data/*
 data_forex/*
 

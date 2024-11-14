@@ -31,6 +31,7 @@ RUN cd Pearl && pip install -e .
 
 RUN xargs -L 1 pip install < requirements.txt
 RUN pip install coinbase-advanced-py
+RUN pip install boto3
 # RUN cd ..
 COPY Keys.py .
 # By default, listen on port 5000
