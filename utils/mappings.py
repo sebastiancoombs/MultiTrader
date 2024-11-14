@@ -1,4 +1,3 @@
-from alpaca.data.timeframe import TimeFrame
 
 
 
@@ -41,6 +40,20 @@ symbol_map={'ADABNB': 0,
  'USDCHF': 23,
  'USD_MXN': 24,
  'USDMXN': 24,
+ 'DOGEUSD': 25,
+'DOGEUSDT': 25,
+'SHIBUSDT': 26,
+'SHIBUSD': 26,
+'LTCUSD': 27,
+'LTCUSDT': 27,
+'SUIUSD': 28,
+'SUIUSDT': 28,
+'DOGEUSD_Futures':29,
+'SHIBUSD_Futures':30,
+'ETHUSD_Futures':31,
+'BTCUSD_Futures':32,
+'SUIUSD_Futures':33,
+'LTCUSD_Futures':34,
  }
 
 binanace_col_map = {
@@ -66,7 +79,21 @@ alpaca_stream_message_map={
                         'd':'Daily Bar',
                         'u':"Updated Bar"
                     }
-alpaca_time_map={
-    '1h':TimeFrame.Hour,
-    '1d':TimeFrame.Day,
+
+try:
+    from alpaca.data.timeframe import TimeFrame
+    alpaca_time_map={
+        '1h':TimeFrame.Hour,
+        '1d':TimeFrame.Day,
+        }
+except:
+    alpaca_time_map={}
+
+oanda_time_map={
+    '1h':'H1',
+    '1d':'D'
 }
+
+coinbase_time_map={'1h':'ONE_HOUR',
+                     '1d':'ONE_DAY'
+    }

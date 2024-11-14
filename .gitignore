@@ -18,3 +18,7 @@ PPO_2024*
 *.gz
 *.bz2
 *.pyc
+brokers/account_managers
+/data_futures
+/PPO_test_render_logs
+/Rayrl_tune

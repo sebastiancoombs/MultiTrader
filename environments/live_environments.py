@@ -3,85 +3,339 @@ import json
 import sqlite3 as db
 import time
 import re
-import alpaca
+
 import numpy as np
-import oandapyV20.endpoints.pricing as pricing
 import pandas as pd
-from binance.spot import Spot
+# from binance.spot import Spot
 from gym_trading_env.utils.history import History
 from gym_trading_env.utils.portfolio import Portfolio
 from tqdm.asyncio import tqdm
-from utils.utils import preprocess_data,sharpe_reward, build_market_image,prepare_forecast_data
+from utils.utils import preprocess_data,prepare_forecast_data
 from utils.mappings import binanace_col_map, symbol_map,alpaca_stream_col_map,alpaca_stream_message_map
 
-from utils.clients import AlpacaClient
+from utils import clients 
 from .environments import NeuralForecastingTradingEnv,NormTradingEnvironment
+from IPython.display import display
+# from oandapyV20.endpoints import pricing 
 
 
+class BaseLiveTradingEnv(NormTradingEnvironment):
 
 
-class LiveTradingEnv(NormTradingEnvironment):
-    def __init__(
-            self,
+    def __init__(self, 
             api_key,
             api_secret=None,
-            test_net=True,
+            account_id=None,
+            paper=True,
             time_frame='1h',
-            target_symbol='ETH/USDT',
-            restore_trading=True,
+            symbol='ETH/USDT',
+            restore_trading=False,
             streaming=False,
             history_path='Trade_history/trade.db',
-            agent=None,
-            render_forecasts=False,
-            onnx_model=False,
+            exchange='coinbase',
             forecast_model=None,
+            product_type='Spot',
+            *args, **kwargs):
+        
+        ## account info
+        self.api_key=api_key
+        self.api_secret=api_secret
+        self.account_id=account_id
+        self.exchange=exchange.lower()
+        self.product_type=product_type.upper()
+        
+        self.supported_exchanges=['coinbase',
+                                #   'binance','alpaca','oanda'
+                                  ]
+
+        ## history path for saving information... possibly not neccesary
+        self._history_path=history_path
+        ## load for do not load a previous trade history
+        self._restore_trading=restore_trading
+
+        ## model_precition_info
+        self.forecast_model=forecast_model
+        self.context_length=max([model.hparams['input_size'] for model in self.forecast_model.models])
+
+        kwargs['max_episode_duration']=self.context_length
+
+        ### trading info
+        self.loading_bar=None
+        self.action_map={x:pct for x,pct in enumerate(kwargs['positions'])}
+        self.side_map={-1:'SELL',1:'BUY',0:'close'}
+        self.position_map={x:y for y,x in self.side_map.items()}
+
+        self.paper=paper
+        
+        ## symbol information
+        self.quote_asset=None
+        self.base_asset=None
+        self.symbol=None
+        self.client=None
+
+        self.time_frame=time_frame
+        client_args=dict(api_key=api_key,api_secret=api_secret,account_id=account_id,product_type=product_type,symbol=symbol,paper=paper,time_frame=time_frame)
+        self.connect_client(**client_args)
+        self.set_base_quote_assets()
+
+        self._streaming=streaming
+
+        ### information about reward suff... probably not neccesary only needed for training
+        self._rew=0
+        self._current_valuation=0
+        self.listen_key=None
+        self.stream_client =None
+
+        df=self.get_data()
+        kwargs['df']=df
+        super().__init__(*args,**kwargs)
+
+    def set_base_quote_assets(self):
+        self.quote_asset=self.client.quote_asset
+        self.base_asset=self.client.base_asset
+        self.symbol=self.client.symbol
+
+    def connect_client(self ,**kwargs):
+        assert self.exchange in self.supported_exchanges, f'{self.exchange} not supported'
+        if self.exchange=='coinbase':
+            self.client=clients.CoinbaseClient(**kwargs)
+        elif self.exchange=='binance':
+            self.client=clients.BinanceClient(**kwargs)
+        elif self.exchange=='alpaca':
+            self.client=clients.AlpacaClient(**kwargs)
+        elif self.exchange=='oanda':
+            self.client=clients.OandaClient(**kwargs)
+
+        print(f'Connected to {self.exchange} client')
+        #### add any other clients here
+
+    def connect_to_db(self):
+        conn = db.connect(self._history_path)
+        return conn
+
+    def get_info(self,old_info):
+            
+        new_info={
+            'date':pd.Timestamp(datetime.datetime.now()).round('H').strftime('%m-%d-%Y,'),
+            'base_asset':self.base_asset,
+            'quote_asset':self.quote_asset,
+            'data_symbol':self.symbol,
+            'position': self.client.get_current_position(),
+            'time_frame':self.time_frame,
+            'exchange':self.exchange,
+            'product_type':self.product_type,
+            'portfolio_distribution_asset':self.client.get_balance(self.base_asset),
+            'portfolio_distribution_fiat':self.client.get_balance(self.quote_asset),
+            'portfolio_valuation':self.client.get_portfolio_value(),
+            
+        }
+        if old_info==None:
+            info=new_info
+        else:
+            old_info.update(new_info)
+            info=old_info
+
+        info['idx']=self._idx
+        info['real_position']=info['position']
+        return info
+
+    def get_data(self,initial_pull=False):
+        print('Getting data')
+        data=self.client.klines(symbol=self.symbol,time_frame= self.time_frame)
+        data=preprocess_data(data)
+        data=prepare_forecast_data(model=self.forecast_model,data=data,time_frame=self.time_frame)
+        
+        return data
+    
+    def _get_obs(self):
+        data=self.get_data()
+        self._set_df(data)
+        obs=super()._get_obs()
+        return obs
+
+    def get_trade_size(self,change_ratio):
+        price=self.client.get_price(self.symbol)
+        porfolio_value=self.client.get_portfolio_value()
+        size_in_dollars=porfolio_value*change_ratio
+        size_in_asset=size_in_dollars/price
+
+        return size_in_dollars,size_in_asset
+
+    def close(self):
+        if self.product_type.upper()=='SPOT':
+            asset_val=self.client.get_balance(self.base_asset)
+            self.client.sell(self.base_asset,base_size=asset_val)
+            
+        elif self.product_type.upper()=='FUTURES':
+            self.client.close_position()
+        else:
+            print(f'{self.product_type} Not supported')
+
+    def _trade(self, new_position):
+        ## get current asset to dollar ratio closest to self.positions
+        self._position=self.client.get_current_position()
+
+        ## get size of assets we have
+        trade_from_to=[self._position,new_position]
+        position_change=float(np.diff([trade_from_to]))
+        ## decide which direction to go
+        buy_sell=int(np.sign(position_change))
+        change_ratio=float(np.abs(position_change))
+        
+        ## get the target potfolio distribution
+        position_target_id=int(np.argmin(np.abs(np.array(self.positions)-position_change)))
+        position_target=self.positions[position_target_id]
+
+        dollar_val,n_asset=self.get_trade_size(change_ratio)
+        
+        info={
+        'New_position':position_target,
+        'Trade_from':trade_from_to[0],
+        'Trade_to':trade_from_to[1],
+        'Change_size':float(position_change),
+        'Change_direction':buy_sell,
+        'Place_order':self.side_map[buy_sell],
+        'Change needed to get to target':change_ratio,
+        'Size in dollars':dollar_val,
+        'Size in asset':n_asset,
+        }
+        order_id=self.get_order_number()
+        print(info)
+        if buy_sell==0:
+            print('No trade')
+            info['order']='No trade'
+            return info
+        
+        elif buy_sell==-1:
+            print('Sell')
+            order_info=self.client.sell(base_size=n_asset,order_id=order_id)
+            info.update(order_info)
+
+        elif buy_sell==1:
+            print('Buy')
+            order_info=self.client.buy(quote_size=dollar_val,order_id=order_id)
+            info.update(order_info)
+
+        return info
+
+    def live_step(self,position_index,wait=False):
+        done, truncated=False,False
+        trade_info={}
+        if position_index is not None: 
+            trade_info=self._trade(self.positions[position_index])
+        # if wait:
+        #     self.wait_for_reward()
+
+        live_info=self.get_info(trade_info)
+        live_info.update(trade_info)
+
+        reward = self.get_reward()
+        obs=self._get_obs()
+        self.save_history(live_info)
+        return obs,  reward, done, truncated,live_info
+
+    def step(self,action):
+        obs,rew,done,truncated,info=self.live_step(action)
+        return obs,rew,done,truncated,info
+
+    def load_history(self):
+        try:
+            conn=self.connect_to_db()
+            query=f"SELECT * FROM {self.base_asset}_trade_history"
+            history=pd.read_sql(query,conn)
+            conn.close()
+        except:
+            history=pd.DataFrame()
+        return history  
+    
+    def save_history(self,info):
+        conn=self.connect_to_db()
+        history=pd.DataFrame([info])
+
+        try:
+            order=history['response'].apply(lambda x: pd.Series(x))
+            history[order.columns]=order
+        except:
+            pass
+        display(history)
+        try:
+            history.to_sql(f'{self.base_asset}_trade_history',conn,if_exists='append',index=False)
+        except Exception as e:
+            print(e)
+            old_history=self.load_history()
+            new_history=pd.concat([old_history,history])
+            new_history.to_sql(f'{self.base_asset}_trade_history',conn,if_exists='replace',index=False)
+        conn.close()
+        return
+    
+    def get_reward(self):
+        history=self.load_history()
+        try:
+            reward=self.reward_function(history)
+        except Exception as e:
+            print(e)
+            reward=0
+
+        return reward
+
+    def get_order_number(self):
+        history=self.load_history()
+        new_order_number=len(history)+1
+        order_id=f'{self.base_asset}_order_{new_order_number}'
+        return order_id
+
+    def reset(self,**kwargs):
+
+        obs,info=super().reset()
+        self._idx=len(self.df)-1
+        print(self._idx)
+        obs=self._get_obs()
+        info=self.get_info(info)
+        
+        return obs,info
+        
+    def wait_for_reward(self):
+        
+        current_time=pd.Timestamp(datetime.datetime.now())
+        
+
+        next_time=current_time+pd.Timedelta( self.time_frame)
+        next_time=next_time.floor(self.time_frame)
+        wait_time=(next_time-current_time).seconds
+
+        valuation=self.client.get_portfolio_value()
+        bar=tqdm(range(wait_time))
+        reward=round(self.historical_info["reward", -1],2)
+        position=self.client.get_current_position()
+        valuation=self.client.get_portfolio_value()
+        reward=1.00
+
+        for i in bar:
+            time.sleep(1)
+            bar.set_description(f'position {self._position} value: {valuation:.2f},reward: {reward:.2f} waiting {int((wait_time-i)/60)} min for next reward')
+            if i%60==0:
+                
+                valuation=self.client.get_portfolio_value()
+
+        return
+    
+class CoinbaseTradingEnv(BaseLiveTradingEnv):
+    def __init__(
+            self,
+            
             *args,
             **kwargs,
             ):
-        self.api_key=api_key
-        self.api_secret=api_secret
-        self.context_length=forecast_model.models[0].input_size
-        self.forecast_model=forecast_model
-
-        kwargs['max_episode_duration']=self.context_length
-        self.live_history=pd.DataFrame(columns=[
-            'portfolio_valuation',
-            'position',
-            
-            ])
-        self.onnx_model=onnx_model
-        self._streaming=streaming
-        self._restore_trading=restore_trading
-        self._history_path=history_path
-        self.time_frame=time_frame
-        
-        self.render_forecasts=render_forecasts
-        self.conn = db.connect(history_path)
-
-        self.agent=agent
-        self._n_steps=0
-        self._trade_info=None
-        self.min_quote_size=None
-        self.max_quote_size=None
-        self.min_asset_size=None
-        self.max_asset_size=None
-        self.quote_asset_precision=None
-        self.base_asset_precision=None
-        self.loading_bar=None
+        super().__init__(*args,**kwargs)
     
+class BinanceTradingEnv(BaseLiveTradingEnv):
+    def __init__(
+            self,
+            
+            *args,
+            **kwargs,
+            ):
 
-        self.action_map={x:pct for x,pct in enumerate(kwargs['positions'])}
-        self.side_map={-1:'SELL',1:'BUY',0:'close'}
-        self.test_net=test_net
-        symbol_split=re.split('/|_|-', target_symbol)
-        self.quote_asset=symbol_split[-1]
-        self.base_asset=symbol_split[0]
-        self.symbol=''.join([self.base_asset,self.quote_asset])
-        self._rew=0
-        self._current_valuation=0
-        self.client=None
-        self.listen_key=None
-        self.stream_client =None
         self._preprocess_data=preprocess_data
         client=self.connect_client()
         listen_key=client.new_listen_key()['listenKey']
@@ -108,22 +362,15 @@ class LiveTradingEnv(NormTradingEnvironment):
         if self.client!=None:
             del self.client
 
-        if self.test_net:
+        if self.paper:
 
             client=Spot(api_key=self.api_key,api_secret=self.api_secret,base_url='https://testnet.binance.vision')
 
         else:
             client=Spot(api_key=self.api_key,api_secret=self.api_secret,base_url='https://api3.binance.com')
-
-
-
-        
+   
         return client
-    
-    def connect_to_db(self):
-        conn = db.connect(self._history_path)
-        return conn
-    
+      
     def set_trade_rules(self):
         '''
         Set the min and max trade_sizes and the values to round by for order precision rounding
@@ -180,12 +427,7 @@ class LiveTradingEnv(NormTradingEnvironment):
         self._prep_forecasts()
         self._set_df(self.get_data())
         
-    def update_portfolio(self):
-        self.account=self.get_account()
-        base_balance=self.get_balance(self.base_asset)
-        quote_balance=self.get_balance(self.quote_asset)
-        self._portfolio.asset=base_balance
-        self._portfolio.fiat=quote_balance
+
     
     def get_account(self):
         account=self.client.account()
@@ -197,115 +439,16 @@ class LiveTradingEnv(NormTradingEnvironment):
         bal=bal['free']
         # print(bal)
         bal=float(bal)
-        
         return bal
     
-    def _get_price(self):
-        price=float(self.client.ticker_price(self.symbol))
-        self._current_price=price
-        return price
 
-    def _take_action(self, position):
-        if position != self._position:
-            self._trade(position)
-        else:
-            self.update_portfolio()        
-            current_portfolio=self._portfolio.get_portfolio_distribution()
-            print(f'{position} stay in position: {current_portfolio}')
-            
-    def _trade(self, position, price = None):
-        self.account=self.get_account()
-        ## get size of assets we have
-        n_dollars=self.get_balance(self.quote_asset)
-        n_asset=self.get_balance(self.base_asset)
-        price=self._get_price()
-        
-        new_position=position
-    
-        # position=self._portfolio.position(price)
-
-        trade_from_to=[self._position,new_position]
-        position_change=np.diff([trade_from_to])
-        position_change=round(float(position_change),2)
-
-        print(f'',position_change)
-
-        ## decide which direction to go
-        side=np.sign(position_change)
-        side_str=self.side_map[side]
-        self.update_portfolio()
-        current_portfolio=self._portfolio.get_portfolio_distribution()
-        current_portfolio['valuation']=self._portfolio.valorisation(price)
-        
-
-        params = {
-            'symbol': self.symbol,
-            'side':side_str,
-            'type': 'MARKET',
-            ## later we can expirement with limit orders
-            # 'type': 'LIMIT',
-            # 'timeInForce': 'GTC',
-            # 'price':float(round(price,8))
-            }
-        
-        if side_str.upper()=='BUY':
-            dollar_val=abs(position_change)*n_dollars
-            asset_size=n_dollars/price
-            trade_size=self.normalize_quote_size(dollar_val)
-
-        elif side_str.upper()=='SELL':
-            asset_size=abs(position_change)*n_asset
-            dollar_val=asset_size*price
-            trade_size=self.normalize_quote_size(dollar_val)
-
-        params['quoteOrderQty']=trade_size
-
-        
-        print('portfoliio',current_portfolio)
-
-        print(f'''Trade {trade_from_to[0]}->{trade_from_to[1]}
-              {position_change}, so {round(dollar_val,2)}{self.quote_asset} / {asset_size:.8f} {self.base_asset},
-              {side_str} {self.base_asset}:{asset_size} for {dollar_val:.2f}$ at {price} {self.symbol}'''
-              )
-        
-        print(params)
-        try: 
-            self.client.new_order(**params)
-        except Exception as e:
-            print(e)
-        self.update_portfolio()
-        self._position = position
-        return
-    
-    def normalize_asset_size(self,size):
-        # balance=self.get_balance(self.base_asset)
-        # current_dols=self.get_balance(self.quote_asset)
-        size=float(size)
-        size=max([self.min_asset_size,size]) # max of smallest possible trades
-        size=min([self.max_asset_size,size])# min of largest possible trades eg. if we dont have enough currency to make a big trade sell everything
-        size=round(size,self.base_asset_precision)
-        return size
-    
-    def normalize_quote_size(self,size):
-        # balance=self.get_balance(self.quote_asset)
-        size=float(size)
-        size=max([self.min_quote_size,size]) # max of smallest possible trades
-        size=min([self.max_quote_size,size]) # min of largest possible trades eg. if we dont have enough currency to make a big trade sell everything 
-        size=round(size,self.quote_asset_precision)
-        return size
-    
     def get_position(self,history):
         current_position=history['position',-1]
         return current_position
 
-    def get_data(self,initial_pull=False):
-        if self._streaming and not initial_pull:
-            data = self.get_stream_data()
-        else:
-            data = self.get_klines()
+
             
-        data=self._preprocess_data(data)
-        data=prepare_forecast_data(model=self.forecast_model,df=data)
+ 
 
         data['ds']=data.index.copy()
         data['symbol'] = self.symbol
@@ -621,7 +764,7 @@ class LiveTradingEnv(NormTradingEnvironment):
         return self._get_obs(), self.historical_info[-1]
 
 
-class AlpacaTradingEnv(LiveTradingEnv):
+class AlpacaTradingEnv(BaseLiveTradingEnv):
     def __init__(
             self,
             *args,
@@ -636,7 +779,7 @@ class AlpacaTradingEnv(LiveTradingEnv):
 
         client=AlpacaClient(api_key=self.api_key,
                             api_secret=self.api_secret,
-                            paper=self.test_net,
+                            paper=self.paper,
                             symbol='/'.join([self.base_asset,self.quote_asset]),
                             time_frame=self.time_frame)
 
@@ -757,16 +900,7 @@ class AlpacaTradingEnv(LiveTradingEnv):
             action,_,states=self.agent.compute_single_action(obs,explore=False)
         obs, reward, terminated, truncated, info=self.live_step(action,wait=False)
 
-    def onnx_infer(self,obs):
-        states=np.zeros(1,dtype=np.float32)
-        input_dict={'obs': np.array([obs]),'state_ins':states}
 
-        outputs = self.agent.run(None,input_dict)
-        states=outputs[-1]
-        action_proba=outputs[0]
-        print(action_proba)
-        action = int(np.argmax(action_proba))
-        return action
     
     async def _live_stream_data_handler(self,message):
 
@@ -828,7 +962,8 @@ class AlpacaTradingEnv(LiveTradingEnv):
             self.loading_bar.update(1)
         
 
-class OandaTradingEnv(AlpacaTradingEnv):
+class OandaTradingEnv(BaseLiveTradingEnv):
+    
     def __init__(
             self,
             account_id=None,
@@ -848,7 +983,7 @@ class OandaTradingEnv(AlpacaTradingEnv):
         client=OandaClient(api_key=self.api_key,
                             account_id=self.account_id,
                         
-                            paper=self.test_net,
+                            paper=self.paper,
                             symbol='_'.join([self.base_asset,self.quote_asset]),
                             time_frame=self.time_frame)
 
@@ -920,7 +1055,6 @@ class OandaTradingEnv(AlpacaTradingEnv):
     
     def get_trade_params(self):
         pass
-
 
     def reset_account(self):
         self.client.update_positions()

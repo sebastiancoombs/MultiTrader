@@ -1,18 +1,14 @@
 
-binance-connector
-alpaca-py
-gym-trading-env==0.3.3
-# gymnasium
-
-coreforecast==0.0.9
-neuralforecast==1.7.2
+ipykernel
+ipywidgets
+gym-trading-env
+neuralforecast
 IPython
-matplotlib==3.8.4
-matplotlib-inline==0.1.7
-gluonts==0.13.2
+gluonts
+finta
 tqdm
-numpy==1.26.4
-oandapyV20
-onnx
-onnxruntime
-setuptools==67.2.0
+optuna
+matplotlib
+scikit-learn
+
+

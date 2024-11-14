@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from .mappings import *
 from finta import TA
-from tqdm.autonotebook import tqdm
+from tqdm import tqdm
 import datetime
 from gluonts.time_feature import time_features_from_frequency_str
 from .ta_mapping import get_ta_funcs
@@ -140,12 +140,10 @@ def stack_arrays(data,name=None,n_samples=24,prediction_window=4,feature_id=1):
 
     return train_list,val_list
 
-def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1,dir='data'):
-def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1,verbose=1,only_target=False,indicators=['RSI','MACD','STOCH',"BBANDS"]):
+def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1,verbose=1,only_target=False,indicators=['RSI','MACD','STOCH',"BBANDS"],data_dir='data'):
 
-    files=glob.glob(f'{dir}/**{time_frame}.pkl',recursive=True)
-    # print(files)
-    files=glob.glob(f'data/**{time_frame}.pkl',recursive=True)
+    files=glob.glob(f'{data_dir}/**{time_frame}.pkl',recursive=True)
+
     if only_target:
         files=[f for f in files if target_pair.replace('/','') in f]
     print(files)
@@ -184,8 +182,6 @@ def sharpe_reward(history):
     reward = 0 if np.isnan(reward) else reward
     return float(reward)
 
-
-
 def prep_forecasts(df:pd.DataFrame,model):
     forecast_array=[]
     # print(self.df.columns)
@@ -203,8 +199,6 @@ def prep_forecasts(df:pd.DataFrame,model):
     forecasts_series=forecasts_series[new_df.index]
     forecast_array=[c for c in forecasts_series]
     return forecast_array,new_df
-
-
 
 def flatten_preds(idx,cut_data,horizon=4):
     t_off_pred,symb=idx
@@ -245,8 +239,11 @@ def prepare_forecast_data(model,data,time_frame='1h',plot=False):
     
     pred_cols=pred_df.filter(like='Auto').columns
     pred_df['mean_pred']=pred_df[pred_cols].mean(axis=1)
-    pred_df=pred_df.drop(pred_cols,axis=1)
+    # pred_df=pred_df.drop(pred_cols,axis=1)
     # pred_df.columns=pred_df.columns.str.replace('Auto','')
+    from IPython.display import display
+    
+
     if plot:
         plot_insample_forecasts(pred_df)
     horizon=model.h
@@ -254,7 +251,11 @@ def prepare_forecast_data(model,data,time_frame='1h',plot=False):
     flattened_preds.index=[c for c in flattened_preds['ds'].values]
 
     flattened_preds=add_time_funcs(flattened_preds,time_frame)
+    flattened_preds['ds']=flattened_preds['ds'].dt.round('H')
+    data['ds']=data['ds'].dt.round('H')
     flattened_preds=pd.merge(flattened_preds,data[['ds','close']],on='ds',how='left')
+    # display(data[['ds','close']])
+    # display(flattened_preds[['ds','close','feature_AutoTFT_H0']])
     front=['ds','close','symbol']
     back=[col for col in flattened_preds.columns if col not in front]
     flattened_preds=flattened_preds[front+back]
@@ -265,11 +266,25 @@ def plot_insample_forecasts(data):
     for symb,cut in data.groupby('symbol'):
         plt.figure(figsize=(10, 5))
         plt.plot(cut['ds'], cut['y'], label='True')
-        plt.plot(cut['ds'], cut['NBEATS'], label='NBEATS Forecast')
-        plt.plot(cut['ds'], cut['BiTCN'], label='BiTCN Forecast')
-        plt.plot(cut['ds'], cut['TFT'], label='TFT Forecast')
+        for model in cut.filter(like='Auto').columns:
+            plt.plot(cut['ds'], cut[model], label=f'{model} Forecast')
         # plt.axvline(cut['ds'].iloc[-12], color='black', linestyle='--', label='Train-Test Split')
         plt.xlabel('Timestamp [t]')
         plt.ylabel(f'{symb} Price')
         plt.grid()
         plt.legend()
+
+def train_test_split_data(data,n_days=14):
+    
+    split_date=datetime.datetime.now()-pd.Timedelta(days=n_days)
+    end_date=datetime.datetime.now()
+    train_data=data.groupby('symbol').apply(lambda x: x[:split_date]).reset_index(drop=True)
+    test_data=data.groupby('symbol').apply(lambda x: x[split_date:end_date]).reset_index(drop=True)
+    return train_data,test_data
+
+def make_hidden_dims(n_layers, n_units):
+    hidden_dims = []
+    for i in range(n_layers):
+        hidden_dims.append(n_units)
+
+    return hidden_dims
