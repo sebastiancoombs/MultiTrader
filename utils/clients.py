@@ -376,9 +376,11 @@ class CoinbaseClient(BaseClient):
                                                     )
             candle_list=self.convert_to_dict_list(candles['candles'])
             klines=pd.DataFrame(candle_list)            
+            klines['start']=klines['start'].astype(int)
             klines['start']=pd.to_datetime(klines['start'],unit='s')
             klines=klines.rename(columns={'start':'date_close'})
             klines['symbol']=symbol
+            # display(klines)
 
             if verbose:
                 display(klines)

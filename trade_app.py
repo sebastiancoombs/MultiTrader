@@ -61,6 +61,7 @@ time_format='%I:%M %p %m-%d-%Y'
 
 
 if __name__ == '__main__':
+        
         start_time=datetime. datetime.now().strftime(time_format)
         print (f'START trading session at {start_time}')
 

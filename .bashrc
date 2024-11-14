@@ -8,7 +8,7 @@ function clean_docker() {
 }
 
 function build_image() {
-    docker build  -t "${1:-ethtrader1}" . ; 
+    docker build --platform=linux/amd64  -t "${1:-ethtrader1}" . ; 
     }
 function test_image() {
     docker run -p 5000:5000 "${1:-ethtrader1}" ; 
