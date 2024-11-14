@@ -14,7 +14,7 @@ from utils.utils import preprocess_data,prepare_forecast_data
 from utils.mappings import binanace_col_map, symbol_map,alpaca_stream_col_map,alpaca_stream_message_map
 
 from utils import clients 
-from .environments import NeuralForecastingTradingEnv,NormTradingEnvironment
+from .environments import NormTradingEnvironment
 from IPython.display import display
 # from oandapyV20.endpoints import pricing 
 

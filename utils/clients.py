@@ -27,6 +27,7 @@ try:
         from alpaca.trading.requests import GetAssetsRequest, MarketOrderRequest
 except:
     print('need to install alpaca')
+
 try:
     from coinbase.rest import RESTClient
 

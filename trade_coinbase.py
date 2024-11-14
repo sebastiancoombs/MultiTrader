@@ -2,6 +2,7 @@
 
 import warnings
 warnings.filterwarnings("ignore")
+warnings.simplefilter("ignore")
 
 
 from environments.live_environments import BaseLiveTradingEnv
