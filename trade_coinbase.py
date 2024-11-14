@@ -13,9 +13,11 @@ import numpy as np
 from utils import pearl_utils
 from Pearl.pearl.utils.instantiations.environments.gym_environment import \
     GymEnvironment
-
+import boto3
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
+    s3= boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
+    s3.download_file('coinbasetradehistory','trade.db','Trade_history/trade.db')
     forecast_model=NeuralForecast.load('MultiHeadForecastingModel/')
 
 
@@ -66,6 +68,8 @@ with warnings.catch_warnings():
             agent.reset(observation, action_space)
             action=agent.act(exploit=True)
             action_result=live_pearl_env.step(int(action))
+            s3.upload_file('Trade_history/trade.db','coinbasetradehistory','trade.db',)
+
 
 # live_env.client.account()
 

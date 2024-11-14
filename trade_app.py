@@ -19,6 +19,8 @@ from utils.utils import sharpe_reward
 pytorch_lightning._logger.setLevel(0)
 
 import logging
+import boto3
+s3 = boto3.client("s3")
 
 logging.getLogger('lightning').setLevel(0)
 import time
@@ -27,7 +29,7 @@ trade_target='ETH/USD'
 trade_interval='1h'
 api_key=alpaca_api_key
 api_secret=alpaca_api_secret
-history_path='Trade_history/trade.db'
+history_path='https://coinbasetradehistory.s3.us-east-1.amazonaws.com/trade.db'
 
 conn=db.connect(history_path)
 
