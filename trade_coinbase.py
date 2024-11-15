@@ -14,8 +14,10 @@ from utils import pearl_utils
 from Pearl.pearl.utils.instantiations.environments.gym_environment import \
     GymEnvironment
 import boto3
+
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
+    warnings.filterwarnings("ignore")
     s3= boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
     s3.download_file('coinbasetradehistory','trade.db','Trade_history/trade.db')
     forecast_model=NeuralForecast.load('MultiHeadForecastingModel/')
@@ -44,6 +46,8 @@ with warnings.catch_warnings():
                 history_path='Trade_history/trade.db',
                 exchange=exchange,
                 forecast_model=forecast_model,
+                discord_webhook='https://discord.com/api/webhooks/986694946381783102/FOA7nG9ShDcXY95-c3XEKV-Fdek66L9xfbQoKuEuFQkK2P4aFWaZ_fKmzw00j8Oj8Woj',
+
 
                 )
 

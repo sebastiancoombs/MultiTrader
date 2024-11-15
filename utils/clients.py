@@ -94,19 +94,31 @@ class BaseClient():
     
     def round_down(self,num, precision):
         multiplier = pow(10,precision)
-        return math.floor(num * multiplier) / multiplier
+        rounded=math.floor(num * multiplier) / multiplier
+        while rounded==0:
+            precision+=1
+            multiplier = pow(10,precision)
+            rounded=math.floor(num * multiplier) / multiplier
 
+
+        return rounded
     def normalize_asset_size(self,size):
+
         balance=self.get_balance(self.base_asset)
         if self.trade_rules==None:
             self.trade_rules=self.get_trade_rules()        
         size=float(size)
+        ## if we want to trade less than the minimum trade size, we trade the minimum trade size
         size=max([self.trade_rules['min_asset_size'],size]) # max of smallest possible trades
+        # trade size should be the smallest of the max trade size, the balance we have avaialble and the size we want to trade
         size=min([self.trade_rules['max_asset_size'],size,balance])# min of largest possible trades eg. if we dont have enough currency to make a big trade sell everything
         size=self.round_down(size,self.trade_rules['base_asset_precision'])
+
         return size
     
     def normalize_quote_size(self,size):
+        
+        size=self.round_down(size,self.trade_rules['quote_asset_precision'])
         balance=self.get_balance(self.quote_asset)
         if self.trade_rules==None:
             self.trade_rules=self.get_trade_rules()
@@ -115,7 +127,6 @@ class BaseClient():
         size=max([self.trade_rules['min_quote_size'],size]) # max of smallest possible trades
         size=min([self.trade_rules['max_quote_size'],size,balance]) # min of largest possible trades eg. if we dont have enough currency to make a big trade sell everything 
         size=round(size,self.trade_rules['quote_asset_precision'])
-        size=self.round_down(size,self.trade_rules['quote_asset_precision'])
 
         return size
     
@@ -445,7 +456,8 @@ class CoinbaseClient(BaseClient):
         return product_frame
     
     def convert_to_dict_list(self,obj_list):
-        return [p.__dict__ for p in obj_list]
+        try:return [p.__dict__ for p in obj_list]
+        except:return obj_list
 
     def get_trade_rules(self,symbol=None):
         if symbol==None:
@@ -511,6 +523,9 @@ class CoinbaseClient(BaseClient):
             symbol=self.symbol
 
         base_size=self.normalize_asset_size(base_size)
+        if base_size==0:
+            order={'success':f'No Order {self.base_asset} balance is too small'}
+            return order
         base_size=str(base_size)
         order_id=self.make_random_id() if order_id==None else order_id
         order_id=str(order_id)

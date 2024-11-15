@@ -17,8 +17,8 @@ from utils import clients
 from .environments import NormTradingEnvironment
 from IPython.display import display
 # from oandapyV20.endpoints import pricing 
-
-
+from utils.discord_utils import send_message_to_channel
+import json
 class BaseLiveTradingEnv(NormTradingEnvironment):
 
 
@@ -35,6 +35,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
             exchange='coinbase',
             forecast_model=None,
             product_type='Spot',
+            discord_webhook=None,
             *args, **kwargs):
         
         ## account info
@@ -43,6 +44,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         self.account_id=account_id
         self.exchange=exchange.lower()
         self.product_type=product_type.upper()
+        self.discord_webhook=discord_webhook
         
         self.supported_exchanges=['coinbase',
                                 #   'binance','alpaca','oanda'
@@ -116,7 +118,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
     def get_info(self,old_info):
             
         new_info={
-            'date':pd.Timestamp(datetime.datetime.now()).round('H').strftime('%m-%d-%Y %I:%M '),
+            'date':pd.Timestamp.now(tz='US/Pacific').strftime('%m-%d-%Y %I:%M %p %Z'),
             'base_asset':self.base_asset,
             'quote_asset':self.quote_asset,
             'data_symbol':self.symbol,
@@ -179,6 +181,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         trade_from_to=[self._position,new_position]
         position_change=float(np.diff([trade_from_to]))
         ## decide which direction to go
+        
         buy_sell=int(np.sign(position_change))
         change_ratio=float(np.abs(position_change))
         
@@ -201,9 +204,9 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         }
         order_id=self.get_order_number()
         print(info)
-        if buy_sell==0:
+        if buy_sell==0 or change_ratio==0:
             print('No trade')
-            info['order']='No trade'
+            info['success']='No Trade'
             return info
         
         elif buy_sell==-1:
@@ -248,8 +251,13 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
             history=pd.DataFrame()
         return history  
     
+
     def save_history(self,info):
         conn=self.connect_to_db()
+        if self.discord_webhook!=None:
+            message=json.dumps(info, indent=2)
+            send_message_to_channel(self.discord_webhook,message)
+
         history=pd.DataFrame([info])
 
         try:
@@ -279,7 +287,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         return reward
 
     def get_order_number(self):
-        history=self.load_history()
+        history=self.client.get_orders()
         new_order_number=len(history)+1
         order_id=f'{self.base_asset}_order_{new_order_number}'
         return order_id
