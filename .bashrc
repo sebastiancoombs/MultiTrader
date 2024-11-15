@@ -18,7 +18,7 @@ function tag_and_push() {
     docker push 905418441144.dkr.ecr.us-east-1.amazonaws.com/metalocal/${1:-ethtrader1}:latest;
     }
 docker tag doge_trader:latest 905418441144.dkr.ecr.us-east-1.amazonaws.com/metalocal/doge_trader:latest
-docker push 905418441144.dkr.ecr.us-east-1.amazonaws.com/metalocal/doge_trader:latest;
+docker push 905418441144.dkr.ecr.us-east-1.amazonaws.com/metalocal/ethtrader1:latest
 
 
 alias connect_ec2="ssh -i aws/FX_trader.pem ec2-user@ec2-34-228-167-95.compute-1.amazonaws.com

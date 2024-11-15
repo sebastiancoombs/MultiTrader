@@ -116,7 +116,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
     def get_info(self,old_info):
             
         new_info={
-            'date':pd.Timestamp(datetime.datetime.now()).round('H').strftime('%m-%d-%Y,'),
+            'date':pd.Timestamp(datetime.datetime.now()).round('H').strftime('%m-%d-%Y %I:%M '),
             'base_asset':self.base_asset,
             'quote_asset':self.quote_asset,
             'data_symbol':self.symbol,
