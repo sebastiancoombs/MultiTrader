@@ -2,11 +2,13 @@
 
 import warnings
 warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore",ResourceWarning)
+
 
 
 from environments.live_environments import BaseLiveTradingEnv
 from neuralforecast.core import NeuralForecast
-from configs import defaults
+from configs import spot_defaults
 from Keys import *
 import pickle
 import numpy as np
@@ -14,10 +16,11 @@ from utils import pearl_utils
 from Pearl.pearl.utils.instantiations.environments.gym_environment import \
     GymEnvironment
 import boto3
-
+from warnings import ResourceWarning
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    warnings.filterwarnings("ignore")
+
+    warnings.filterwarnings("ignore",ResourceWarning)
     s3= boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
     s3.download_file('coinbasetradehistory','trade.db','Trade_history/trade.db')
     forecast_model=NeuralForecast.load('MultiHeadForecastingModel/')
@@ -73,7 +76,6 @@ with warnings.catch_warnings():
             action=agent.act(exploit=True)
             action_result=live_pearl_env.step(int(action))
             s3.upload_file('Trade_history/trade.db','coinbasetradehistory','trade.db',)
-
 
 # live_env.client.account()
 

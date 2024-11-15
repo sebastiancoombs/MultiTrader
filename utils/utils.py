@@ -172,6 +172,8 @@ def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1,verbose=1,o
         big_data.append(feauture_data)
         # data=data.to_pickle(file)
     big_data=pd.concat(big_data,axis=axis)
+    if 'symbol_name'in big_data.columns:
+        big_data=big_data.drop('symbol_name',axis=1)
     return big_data
 
 def sharpe_reward(history):
@@ -274,12 +276,15 @@ def plot_insample_forecasts(data):
         plt.grid()
         plt.legend()
 
-def train_test_split_data(data,n_days=14):
+def train_test_split_data(data,n_days=14,round_factor='H'):
     
-    split_date=datetime.datetime.now()-pd.Timedelta(days=n_days)
-    end_date=datetime.datetime.now()
+    split_date=(pd.Timestamp.now()-pd.Timedelta(days=n_days)).round(round_factor)
+    end_date=pd.Timestamp.now().round(round_factor)
+    
+    print(split_date,end_date)
+    data.index=data.index.round(round_factor)
     train_data=data.groupby('symbol').apply(lambda x: x[:split_date]).reset_index(drop=True)
-    test_data=data.groupby('symbol').apply(lambda x: x[split_date:end_date]).reset_index(drop=True)
+    test_data=data.groupby('symbol').apply(lambda x: x[split_date:]).reset_index(drop=True)
     return train_data,test_data
 
 def make_hidden_dims(n_layers, n_units):
