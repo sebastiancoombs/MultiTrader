@@ -18,6 +18,7 @@ from Pearl.pearl.utils.instantiations.environments.gym_environment import \
 import boto3
 import shutil
 import tempfile
+from IPython.display import display
 with tempfile.TemporaryDirectory() as temp_dir:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -68,19 +69,18 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
         live_pearl_env=GymEnvironment(live_env)
 
-        if __name__ == '__main__':
-                
-                observation,action_space=live_pearl_env.reset()
-                agent.reset(observation, action_space)
-                action=agent.act(exploit=True)
-                action_result=live_pearl_env.step(int(action))
-                agent.observe(action_result)
-                action=agent.act(exploit=True)
-                live_pearl_env.step(action)
-                s3.upload_file('Trade_history/trade.db','coinbasetradehistory','trade.db',)
-                # shutil.rmtree('/var/folders/nv/')
 
-# live_env.client.account()
+                
+        observation,action_space=live_pearl_env.reset()
+        agent.reset(observation, action_space)
+        action_result=live_pearl_env.step()
+        agent.observe(action_result)
+        action=agent.act(exploit=True)
+        live_pearl_env.step(action)
+        s3.upload_file('Trade_history/trade.db','coinbasetradehistory','trade.db',)
+        # shutil.rmtree('/var/folders/nv/')
+        # live_env.client.account()
+        display(live_env.client.account())
 
 
 

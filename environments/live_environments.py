@@ -221,9 +221,10 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
 
         return info
 
-    def live_step(self,position_index,wait=False):
+    def live_step(self,position_index=None,wait=False):
         done, truncated=False,False
         trade_info={}
+        
         if position_index is not None: 
             trade_info=self._trade(self.positions[position_index])
         # if wait:
