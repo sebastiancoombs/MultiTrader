@@ -12,21 +12,16 @@ RUN apt-get update
 RUN apt-get install git -y
 RUN git config --global http.sslverify false
 
-RUN cp certs/cacert.crt /usr/local/share/ca-certificates/cacert.crt \
-        &&\
-    update-ca-certificates
+COPY certs/cacert.crt /usr/local/share/ca-certificates/cacert.crt 
+        
+RUN update-ca-certificates
 RUN export SSL_CERT_FILE=/usr/local/share/ca-certificates/cacert.crt
 RUN export REQUESTS_CA_BUNDLE=/usr/local/share/ca-certificates/cacert.crt
-# RUN apt-get install -y ca-certificates§
-# RUN update-ca-certificates && \
-#     echo export SSL_CERT_DIR=/etc/ssl/certs >> /etc/bash.bashrc && \
-#     echo export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt >> /etc/bash.bashrc
-# RUN xargs -L 1 pip install < requirements.txt
+
 RUN git clone https://github.com/sebastiancoombs/MultiTrader.git
-
 WORKDIR /MultiTrader/
-
 RUN git clone https://github.com/facebookresearch/Pearl.git
+
 RUN ls -la
 
 RUN pip install --upgrade pip
@@ -39,6 +34,11 @@ RUN xargs -L 1 pip install < requirements.txt
 RUN pip install coinbase-advanced-py
 RUN pip install boto3
 RUN pip install --upgrade certifi
+RUN CERT_PATH=$(python -m certifi) \
+        &&\
+    export SSL_CERT_FILE=${CERT_PATH}\
+        &&\
+    export REQUESTS_CA_BUNDLE=${CERT_PATH}
 # RUN cd ..
 COPY Keys.py .
 # By default, listen on port 5000

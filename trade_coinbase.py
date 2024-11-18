@@ -51,8 +51,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
                     history_path='Trade_history/trade.db',
                     exchange=exchange,
                     forecast_model=forecast_model,
-                    discord_webhook='https://discord.com/api/webhooks/986694946381783102/FOA7nG9ShDcXY95-c3XEKV-Fdek66L9xfbQoKuEuFQkK2P4aFWaZ_fKmzw00j8Oj8Woj',
-
+                    discord_webhook=disord_webhook,
 
                     )
 
