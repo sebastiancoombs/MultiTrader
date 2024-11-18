@@ -9,7 +9,7 @@ from utils.reward_functions import sharpe_reward_function
 from environments.environments import NormTradingEnvironment
 import copy
 ## CHANGE THIS DEFAULT TO CHANGE PARAMS FROM CONFIGS
-from configs import futures_defaults as defaults
+from configs import spot_defaults as defaults
 from IPython.display import display
 COIN_PAIRS=defaults.COIN_PAIRS
 target_pair=defaults.target_pair

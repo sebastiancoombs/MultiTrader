@@ -172,14 +172,14 @@ def test_pearl_model( agent,env,n_samples=100):
 
     return np.mean(profits),np.mean(n_trades)
 
-def load_agent_from_study(study_path,study_name,observation_space_dim=30,action_space_dim=2):
+def load_agent_from_study(study_path,study_name,observation_space_dim=30,action_space_dim=2,version=1):
     study = optuna.create_study(study_name=study_name,
                             directions=["maximize", "maximize"],
                             storage=study_path,
                             load_if_exists=True,
                             )
     best_trials=study.best_trials
-    best_trail=best_trials[2]
+    best_trail=best_trials[version]
     best_params=best_trail.params
     
     algo=best_params.pop('algorithm')
@@ -190,7 +190,7 @@ def load_agent_from_study(study_path,study_name,observation_space_dim=30,action_
                         'reward_function':best_params.pop('reward_function')
                         }
     best_params['hidden_dims']=make_hidden_dims(n_layers=best_params.pop('n_layers'),n_units=best_params.pop('n_units'))
-    best_params['lstm']=best_params.pop('use_lstm')
+    best_params['lstm']=best_params.pop('use_lstm') if 'use_lstm' in best_params else best_params.pop('lstm')
     best_params['observation_space_dim']=observation_space_dim
     best_params['action_space_dim']=action_space_dim
     if algo=='dqn':
@@ -217,4 +217,4 @@ def train_production_agent(agent,learning_params,train_env,test_env,save_path):
     print(f"Testing Return AVG Profit: {profit}, AVG Number of Trades: {n_trades}")
     agent=train_pearl_model(agent,test_env,**learning_params)
     pickle.dump(agent.policy_learner.state_dict(),open(save_path,'wb'))
-    return agent
+    return agent,profit,n_trades
