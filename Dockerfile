@@ -33,7 +33,7 @@ RUN CERT_PATH=$(python -m certifi) &&\
 ## change work dir to the cloned folder
 # WORKDIR MultiTrader/
 ## Clone the neural network lib
-# RUN git clone https://github.com/facebookresearch/Pearl.git
+# RUN git clone https://github.com/sebastiancoombs/Pearl
 
 # instead of installing from Git install form local
 ADD . .
