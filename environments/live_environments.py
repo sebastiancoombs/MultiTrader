@@ -10,15 +10,18 @@ import pandas as pd
 from gym_trading_env.utils.history import History
 from gym_trading_env.utils.portfolio import Portfolio
 from tqdm.asyncio import tqdm
-from utils.utils import preprocess_data,prepare_forecast_data
+from utils.utils import preprocess_data,prepare_forecast_data,plot_insample_forecasts
 from utils.mappings import binanace_col_map, symbol_map,alpaca_stream_col_map,alpaca_stream_message_map
 
 from utils import clients 
 from .environments import NormTradingEnvironment
 from IPython.display import display
 # from oandapyV20.endpoints import pricing 
-from utils.discord_utils import send_message_to_channel
+from utils.discord_utils import send_message_to_channel,send_picture_to_channel
 import json
+import traceback
+import matplotlib.pyplot as plt
+
 class BaseLiveTradingEnv(NormTradingEnvironment):
 
 
@@ -49,7 +52,8 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         self.supported_exchanges=['coinbase',
                                 #   'binance','alpaca','oanda'
                                   ]
-
+        self.pred_df=None
+        self.raw_df=None
         ## history path for saving information... possibly not neccesary
         self._history_path=history_path
         ## load for do not load a previous trade history
@@ -59,7 +63,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         self.forecast_model=forecast_model
         self.context_length=max([model.hparams['input_size'] for model in self.forecast_model.models])
 
-        kwargs['max_episode_duration']=self.context_length
+        kwargs['max_episode_duration']='max'
 
         ### trading info
         self.loading_bar=None
@@ -141,13 +145,48 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         info['real_position']=info['position']
         return info
 
-    def get_data(self,initial_pull=False):
+    def get_data(self):
         print('Getting data')
         data=self.client.klines(symbol=self.symbol,time_frame= self.time_frame)
+        self.raw_df=data.copy()
         data=preprocess_data(data)
-        data=prepare_forecast_data(model=self.forecast_model,data=data,time_frame=self.time_frame)
+        data,pred_df=prepare_forecast_data(model=self.forecast_model,
+                                           data=data,
+                                           time_frame=self.time_frame,
+                                           real=True,
+                                           symbol=self.base_asset)
+        price=self.client.get_price(self.symbol)
+        data['close']=price
+        
+        
+        self.pred_df=pred_df
         
         return data
+    
+    def prepare_plot_df(self):
+        self.raw_df['ds']=self.raw_df['date_close']
+        plot_df=pd.concat([self.raw_df[['ds','close']],self.pred_df],axis=0).reset_index(drop=True)
+        plot_df['symbol']=plot_df['symbol'].fillna(method='ffill').fillna(method='bfill')
+        plot_df=plot_df[-60:]
+        plot_df['close']=pd.to_numeric(plot_df['close'])
+        return plot_df 
+    
+    def plot_forecasts(self,plot_df,symb):
+        fig,axes=plt.subplots(sharex=True, sharey=True, figsize=(10, 5))
+        time=pd.Timestamp(plot_df['ds'].values[-1]).strftime('%m-%d-%Y %I:%M%p')
+
+        axes.plot(plot_df['ds'], plot_df['close'], label='Close Price')
+        for model in plot_df.select_dtypes(np.number).columns:
+            if model=='close':
+                continue
+            axes.plot(plot_df['ds'], plot_df[model], label=f'{model} Forecast')
+        
+        axes.set_xlabel('Timestamp [t]')
+        axes.set_ylabel(f'{symb} Price')
+        axes.set_title(f'{symb} Forecast through {time}')
+        axes.grid()
+        fig.legend()
+        return fig
     
     def _get_obs(self):
         data=self.get_data()
@@ -257,7 +296,16 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         conn=self.connect_to_db()
         if self.discord_webhook!=None:
             message=json.dumps(info, indent=2)
-            send_message_to_channel(self.discord_webhook,message)
+            try:
+                send_message_to_channel(self.discord_webhook,message)
+                plot_df=self.prepare_plot_df()
+                display(plot_df)
+                fig=self.plot_forecasts(plot_df=plot_df,symb=self.base_asset)
+                fig.savefig('forecasts.png')
+                send_picture_to_channel(self.discord_webhook,file='forecasts.png')
+                
+            except Exception as e:
+                traceback.print_exc()
 
         history=pd.DataFrame([info])
 

@@ -1,4 +1,4 @@
-from configs import spot_defaults
+from configs import defaults
 
 import datetime
 from utils.utils import prepare_forecast_data,build_market_image,train_test_split_data
@@ -8,8 +8,8 @@ import numpy as np
 from utils.reward_functions import sharpe_reward_function
 from environments.environments import NormTradingEnvironment
 import copy
-## CHANGE THIS DEFAULT TO CHANGE PARAMS FROM CONFIGS
-from configs import spot_defaults as defaults
+
+
 from IPython.display import display
 COIN_PAIRS=defaults.COIN_PAIRS
 target_pair=defaults.target_pair
@@ -24,10 +24,10 @@ def n_trades(history):
 def make_envs(reward_function):
     model=NeuralForecast.load(model_path)
     ohlv_data=build_market_image(data_dir=DATA_DIR,target_pair=target_pair,time_frame='1h',axis=0,verbose=1,only_target=True)
-    display(ohlv_data.head())
-    print(ohlv_data.columns)
+#     print(ohlv_data.columns)
     
-    data=prepare_forecast_data(model,ohlv_data,plot=True)
+    data,pred_df=prepare_forecast_data(model,ohlv_data,real=False)
+#     display(data)
     data.index=pd.to_datetime(data['ds'])
     train_data,test_data=train_test_split_data(data,n_days=30)
     

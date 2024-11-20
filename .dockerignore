@@ -15,11 +15,12 @@ __pycache__/
 /lightning_logs/**
 /Trade_history/**
 forecasting_model/
-Agent/
+# Agent/
 Agent_FX/
 Agent_Tune/
 data/
 data_forex/
+data_futures/
 
 .bachrc
 

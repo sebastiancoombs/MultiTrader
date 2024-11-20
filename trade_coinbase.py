@@ -8,7 +8,7 @@ warnings.filterwarnings("ignore",category=ResourceWarning)
 
 from environments.live_environments import BaseLiveTradingEnv
 from neuralforecast.core import NeuralForecast
-from configs import spot_defaults
+from configs import defaults
 from Keys import *
 import pickle
 import numpy as np
@@ -19,6 +19,7 @@ import boto3
 import shutil
 import tempfile
 from IPython.display import display
+from configs import defaults
 with tempfile.TemporaryDirectory() as temp_dir:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -26,7 +27,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
         s3= boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
         s3.download_file('coinbasetradehistory','trade.db','Trade_history/trade.db')
-        forecast_model=NeuralForecast.load('MultiHeadForecastingModel/')
+        forecast_model=NeuralForecast.load(defaults.forecasting_model_path)
 
 
         base_asset='DOGE'
@@ -58,29 +59,31 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
 
 
-        agent_path='Agent/pearl_DOGEUSDT_Spot_model.pkl'
+        agent_path=f'Agent/pearl_{defaults.model_name}_model.pkl'
+        s3.download_file('coinbasetradehistory',f'pearl_{defaults.model_name}_model.pkl',agent_path)
 
         agent=pickle.load(open(agent_path,'rb'))
-
-
-
-
-
 
         live_pearl_env=GymEnvironment(live_env)
 
 
                 
         observation,action_space=live_pearl_env.reset()
-        agent.reset(observation, action_space)
-        action_result=live_pearl_env.step()
+        # agent.reset(observation, action_space)
+        current_position=int(live_env.client.get_current_position())
+        # action=agent.act(exploit=True)
+        action=live_env.action_map[current_position]
+        action_result=live_pearl_env.step(action=current_position)
         agent.observe(action_result)
         action=agent.act(exploit=True)
         live_pearl_env.step(action)
+        
         s3.upload_file('Trade_history/trade.db','coinbasetradehistory','trade.db',)
-        # shutil.rmtree('/var/folders/nv/')
-        # live_env.client.account()
+        s3.upload_file(agent_path,'coinbasetradehistory',agent_path.split('/')[-1],)
+
         display(live_env.client.account())
+
+
 
 
 

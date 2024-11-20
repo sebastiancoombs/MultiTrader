@@ -74,6 +74,7 @@ class BaseClient():
         # print(symbol,time_frame,limit,start_date)
         #
         data=self.get_historical_data(symbol,start_date=start_date,end_date=datetime.datetime.now())
+        data=data.sort_values('date_close')
         return data
 
     def account(self):

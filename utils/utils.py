@@ -9,6 +9,7 @@ from tqdm import tqdm
 import datetime
 from gluonts.time_feature import time_features_from_frequency_str
 from .ta_mapping import get_ta_funcs
+from IPython.display import display
 
 def add_indicator(func_name,data):
     try:
@@ -70,18 +71,12 @@ def preprocess_data(data,indicators=['RSI','MACD','STOCH',"BBANDS"],time_frame='
         
     if 'date_open' in data.columns:
         data=data.drop(['date_open'],axis=1)
-    
+    data=data.sort_index()
     data=add_time_funcs(data,time_frame)
     data=add_ta_indicators(data,indicators=indicators)
     
-    # for r in returns:
-    #     data[f'feature_log_return_{r}'] = np.log(1 + data.close.pct_change(r)+1e-15)
-    #     data[f'feature_log_volume_{r}'] = np.log(1 + data.volume.pct_change(r)+1e-15)
-    
-
     data = data.replace((np.inf, -np.inf,np.nan), 0)
-    # data=data-data.min(0)/(data.max(0)-data.min(0))
-    # data=data-data.min(0)/(data.max(0)-data.min(0))
+
     data['ds']=data.index.values
     data['ds']=data['ds'].apply(pd.Timestamp)
     return data
@@ -202,14 +197,61 @@ def prep_forecasts(df:pd.DataFrame,model):
     forecast_array=[c for c in forecasts_series]
     return forecast_array,new_df
 
+def simulate_forecasts(model,df,refit_scalers=False):
+    model.dataset, model.uids, model.last_dates, model.ds = model._prepare_fit(
+                df=df,
+                static_df=None,
+                sort_df=model.sort_df,
+                predict_only=refit_scalers,
+                id_col=model.id_col,
+                time_col=model.time_col,
+                target_col=model.target_col,
+            )
+    
+    pred_df= model.predict_insample(step_size=1)
+    pred_cols=pred_df.filter(like='Auto').columns
+    pred_df['mean_pred']=pred_df[pred_cols].mean(axis=1)
+    return pred_df
+
+def generate_forecasts(model,df):
+    
+    pred_df= model.predict(df)
+    pred_df=pred_df.reset_index()
+    pred_cols=pred_df.filter(like='Auto').columns
+    pred_df['mean_pred']=pred_df[pred_cols].mean(axis=1)
+    pred_df['cutoff']=df['ds'][-1]
+    return pred_df
+
+def prepare_forecast_data(model,data,time_frame='1h',real=False,symbol=None):
+    if real:
+        pred_df=generate_forecasts(model,data)
+    else:
+        pred_df= simulate_forecasts(model,data)
+
+    if symbol!=None:
+        pred_df=pred_df[pred_df['symbol'].str.contains(symbol)]
+
+    horizon=model.h
+    flattened_preds=flatten_pred_df(data,pred_df,horizon=horizon,time_frame=time_frame)
+
+    if not real:
+        flattened_preds=flattened_preds.dropna(subset=['close'],axis=0)
+    else: 
+        flattened_preds['close']=flattened_preds['close'].ffill()
+
+    return flattened_preds,pred_df
+
 def flatten_preds(idx,cut_data,horizon=4):
     t_off_pred,symb=idx
+    drop_cols=['cutoff','ds','y','symbol']
+
     t_cut=cut_data.T
     t_cut.columns=[f'H{i}' for i in range(horizon)]
-    t_cut=t_cut.drop('cutoff')
-    t_cut=t_cut.drop('ds')
-    t_cut=t_cut.drop('y')
+    
 
+    for col in drop_cols:
+        if col in t_cut.index:
+            t_cut=t_cut.drop(col)
 
     flat_cols=[f'feature_{model}_{horizon}' for model in t_cut.index for horizon in t_cut.columns]
     pred_values=t_cut.values.flatten()
@@ -221,34 +263,7 @@ def flatten_preds(idx,cut_data,horizon=4):
     flat_df=  flat_df[id_cols+flat_cols]
     return flat_df
 
-def simulate_forecasts(model,df):
-    model.dataset, model.uids, model.last_dates, model.ds = model._prepare_fit(
-                df=df,
-                static_df=None,
-                sort_df=model.sort_df,
-                predict_only=False,
-                id_col=model.id_col,
-                time_col=model.time_col,
-                target_col=model.target_col,
-            )
-    
-    preds= model.predict_insample(step_size=1)
-    return preds
-
-def prepare_forecast_data(model,data,time_frame='1h',plot=False):
-    
-    pred_df= simulate_forecasts(model,data)
-    
-    pred_cols=pred_df.filter(like='Auto').columns
-    pred_df['mean_pred']=pred_df[pred_cols].mean(axis=1)
-    # pred_df=pred_df.drop(pred_cols,axis=1)
-    # pred_df.columns=pred_df.columns.str.replace('Auto','')
-    from IPython.display import display
-    
-
-    if plot:
-        plot_insample_forecasts(pred_df)
-    horizon=model.h
+def flatten_pred_df(data,pred_df,horizon=4,time_frame='1h'):
     flattened_preds=pd.concat([flatten_preds(idx,cut_data,horizon=horizon) for idx,cut_data in pred_df.groupby(['cutoff','symbol'])])
     flattened_preds.index=[c for c in flattened_preds['ds'].values]
 
@@ -261,12 +276,26 @@ def prepare_forecast_data(model,data,time_frame='1h',plot=False):
     front=['ds','close','symbol']
     back=[col for col in flattened_preds.columns if col not in front]
     flattened_preds=flattened_preds[front+back]
-    flattened_preds=flattened_preds.dropna(subset=['close'],axis=0)
+
     return flattened_preds
 
 def plot_insample_forecasts(data):
+    fig,axes=plt.subplots(figsize=(10, 5))
     for symb,cut in data.groupby('symbol'):
-        plt.figure(figsize=(10, 5))
+        fig,axes=plt.subplot(1,1,figsize=(10, 5))
+        plt.plot(cut['ds'], cut['y'], label='True')
+        for model in cut.filter(like='Auto').columns:
+            plt.plot(cut['ds'], cut[model], label=f'{model} Forecast')
+        # plt.axvline(cut['ds'].iloc[-12], color='black', linestyle='--', label='Train-Test Split')
+        plt.xlabel('Timestamp [t]')
+        plt.ylabel(f'{symb} Price')
+        plt.grid()
+        plt.legend()
+
+def plot_forecasts(data):
+    fig,axes=plt.subplots(figsize=(10, 5))
+    for symb,cut in data.groupby('symbol'):
+        fig,axes=plt.subplot(1,1,figsize=(10, 5))
         plt.plot(cut['ds'], cut['y'], label='True')
         for model in cut.filter(like='Auto').columns:
             plt.plot(cut['ds'], cut[model], label=f'{model} Forecast')
