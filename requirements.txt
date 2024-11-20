@@ -9,11 +9,7 @@ finta
 tqdm
 optuna
 matplotlib
-
 scikit-learn
-
 discord
-
 coinbase-advanced-py
-
 boto3
