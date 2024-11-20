@@ -10,8 +10,7 @@ RUN apt-get install -f
 RUN apt-get update
 RUN apt-get install -y ca-certificates
 ## update the certificates
-RUN pip install --upgrade pip
-RUN pip install --upgrade certifi 
+RUN pip install --upgrade pip certifi
 
 ## try to ignore warnings but it doesnt seet to work
 RUN export PYTHONWARNINGS="ignore:ResourceWarning"

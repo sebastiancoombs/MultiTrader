@@ -291,7 +291,6 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
             history=pd.DataFrame()
         return history  
     
-
     def save_history(self,info):
         conn=self.connect_to_db()
         if self.discord_webhook!=None:
