@@ -22,3 +22,4 @@ brokers/account_managers
 /data_futures
 /PPO_test_render_logs
 /Rayrl_tune
+*.png
