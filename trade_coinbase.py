@@ -72,8 +72,11 @@ with tempfile.TemporaryDirectory() as temp_dir:
         # agent.reset(observation, action_space)
         current_position=int(live_env.client.get_current_position())
         # action=agent.act(exploit=True)
+        live_pearl_env.env.allow_trade_submit=False
         action=live_env.action_map[current_position]
         action_result=live_pearl_env.step(action=current_position)
+
+        live_pearl_env.env.allow_trade_submit=True
         agent.observe(action_result)
         action=agent.act(exploit=True)
         live_pearl_env.step(action)

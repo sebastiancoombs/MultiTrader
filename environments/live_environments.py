@@ -48,6 +48,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         self.exchange=exchange.lower()
         self.product_type=product_type.upper()
         self.discord_webhook=discord_webhook
+        self.allow_trade_submit=True
         
         self.supported_exchanges=['coinbase',
                                 #   'binance','alpaca','oanda'
@@ -164,7 +165,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         return data
     
     def prepare_plot_df(self):
-        self.raw_df['ds']=self.raw_df['date_close']
+        self.raw_df['ds']=self.raw_df['date_close'].copy()
         plot_df=pd.concat([self.raw_df[['ds','close']],self.pred_df],axis=0).reset_index(drop=True)
         plot_df['symbol']=plot_df['symbol'].fillna(method='ffill').fillna(method='bfill')
         plot_df=plot_df[-60:]
@@ -215,6 +216,8 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
     def _trade(self, new_position):
         ## get current asset to dollar ratio closest to self.positions
         self._position=self.client.get_current_position()
+        current_position_idx=int(np.argmin(np.abs(np.array(self.positions)-self._position)))
+        current_position=self.positions[current_position_idx]
 
         ## get size of assets we have
         trade_from_to=[self._position,new_position]
@@ -231,7 +234,9 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         dollar_val,n_asset=self.get_trade_size(change_ratio)
         
         info={
+        'Current_position':current_position,
         'New_position':position_target,
+
         'Trade_from':trade_from_to[0],
         'Trade_to':trade_from_to[1],
         'Change_size':float(position_change),
@@ -243,9 +248,10 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         }
         order_id=self.get_order_number()
         print(info)
-        if buy_sell==0 or change_ratio==0:
+        if info['Current_position'] == info['New_position']:
             print('No trade')
-            info['success']='No Trade'
+            info['success']=False
+            info['error']='No Position Change so did not Submit Trade'
             return info
         
         elif buy_sell==-1:
@@ -263,18 +269,17 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
     def live_step(self,position_index=None,wait=False):
         done, truncated=False,False
         trade_info={}
-        
-        if position_index is not None: 
-            trade_info=self._trade(self.positions[position_index])
-        # if wait:
-        #     self.wait_for_reward()
+        if self.allow_trade_submit==True:
+            if position_index is not None: 
+                trade_info=self._trade(self.positions[position_index])
 
         live_info=self.get_info(trade_info)
         live_info.update(trade_info)
 
         reward = self.get_reward()
         obs=self._get_obs()
-        self.save_history(live_info)
+        if self. allow_trade_submit==True:
+            self.save_history(live_info)
         return obs,  reward, done, truncated,live_info
 
     def step(self,action):
@@ -296,12 +301,15 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         if self.discord_webhook!=None:
             message=json.dumps(info, indent=2)
             try:
+
                 send_message_to_channel(self.discord_webhook,message)
                 plot_df=self.prepare_plot_df()
                 display(plot_df)
                 fig=self.plot_forecasts(plot_df=plot_df,symb=self.base_asset)
-                fig.savefig('forecasts.png')
-                send_picture_to_channel(self.discord_webhook,file='forecasts.png')
+                fig_time=pd.Timestamp.now().strftime('%m-%d-%Y %I:%M%p')
+                fig_name=f'{fig_time}_forecasts.png'
+                fig.savefig(fig_name)
+                send_picture_to_channel(self.discord_webhook,file=fig_name)
                 
             except Exception as e:
                 traceback.print_exc()

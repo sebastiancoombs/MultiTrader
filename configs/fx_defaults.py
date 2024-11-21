@@ -2,7 +2,9 @@ COIN_PAIRS=['EURUSD','USDJPY','GBPUSD','AUDUSD','USDCAD','USDCHF','NZDUSD'
             ]
 target_pair = 'USDJPY'
 time_frame = '1h'
-forecasting_model_path='FXForecastingModel/'
+
+forecasting_model_path=f'ForecastingModels/{target_pair}ForecastingModel/'
+
 DATA_DIR='data_fx'
 model_name='JPYUSD'
 

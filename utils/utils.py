@@ -282,28 +282,28 @@ def flatten_pred_df(data,pred_df,horizon=4,time_frame='1h'):
 def plot_insample_forecasts(data):
     fig,axes=plt.subplots(figsize=(10, 5))
     for symb,cut in data.groupby('symbol'):
-        fig,axes=plt.subplot(1,1,figsize=(10, 5))
-        plt.plot(cut['ds'], cut['y'], label='True')
+        axes=fig.add_subplot()
+        axes.plot(cut['ds'], cut['y'], label='True')
         for model in cut.filter(like='Auto').columns:
             plt.plot(cut['ds'], cut[model], label=f'{model} Forecast')
         # plt.axvline(cut['ds'].iloc[-12], color='black', linestyle='--', label='Train-Test Split')
-        plt.xlabel('Timestamp [t]')
-        plt.ylabel(f'{symb} Price')
-        plt.grid()
-        plt.legend()
+        axes.set_xlabel('Timestamp [t]')
+        axes.set_ylabel(f'{symb} Price')
+
+        fig.legend()
 
 def plot_forecasts(data):
     fig,axes=plt.subplots(figsize=(10, 5))
     for symb,cut in data.groupby('symbol'):
         fig,axes=plt.subplot(1,1,figsize=(10, 5))
-        plt.plot(cut['ds'], cut['y'], label='True')
+        axes.plot(cut['ds'], cut['y'], label='True')
         for model in cut.filter(like='Auto').columns:
-            plt.plot(cut['ds'], cut[model], label=f'{model} Forecast')
+            axes.plot(cut['ds'], cut[model], label=f'{model} Forecast')
         # plt.axvline(cut['ds'].iloc[-12], color='black', linestyle='--', label='Train-Test Split')
-        plt.xlabel('Timestamp [t]')
-        plt.ylabel(f'{symb} Price')
-        plt.grid()
-        plt.legend()
+        axes.xlabel('Timestamp [t]')
+        axes.ylabel(f'{symb} Price')
+        axes.grid()
+        axes.legend()
 
 def train_test_split_data(data,n_days=14,round_factor='H'):
     

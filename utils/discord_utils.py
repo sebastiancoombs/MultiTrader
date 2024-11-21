@@ -17,6 +17,6 @@ def send_message_to_channel(channel_url, message):
 def send_picture_to_channel(channel_url,message='',file=None):
     webhook=make_web_hook(channel_url)
 
-    file=File(fp="unemployment_chart.png")
+    file=File(fp=file)
     webhook.send(file=file,content=message)
     return
