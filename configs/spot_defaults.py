@@ -2,7 +2,7 @@ COIN_PAIRS=['DOGE/USDT','LTC/USDT','SHIB/USDT','ETH/USDT','BTC/USDT','XRP/USDT',
             ]
 target_pair = 'DOGEUSDT'
 time_frame = '1h'
-forecasting_model_path=f'{target_pair}ForecastingModel/'
+forecasting_model_path=f'ForecastingModels/{target_pair}ForecastingModel/'
 DATA_DIR='data'
 model_name=f'{target_pair}SPOT'
 

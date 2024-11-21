@@ -10,6 +10,7 @@ import datetime
 from gluonts.time_feature import time_features_from_frequency_str
 from .ta_mapping import get_ta_funcs
 from IPython.display import display
+from gym_trading_env.downloader import EXCHANGE_LIMIT_RATES, download
 
 def add_indicator(func_name,data):
     try:
@@ -322,3 +323,18 @@ def make_hidden_dims(n_layers, n_units):
         hidden_dims.append(n_units)
 
     return hidden_dims
+
+def refresh_crypto_data(data_dir='data',time_frame='1h',pairs=[]):
+    EXCHANGE_LIMIT_RATES["binanceus"] = {
+    "limit" : 200, # One request will query 200 data points (aka candlesticks).
+    "pause_every" : 120, # it will pause every 120 requests.
+    "pause" : 2, # the pause will last 2 seconds.
+    }
+
+    download(exchange_names = ["binanceus"],
+    symbols= tqdm(COIN_PAIRS),
+    timeframe= time_frame,
+    dir = data_dir,
+    since= datetime.datetime(year= 2024, month= 1, day=1),
+
+    )
