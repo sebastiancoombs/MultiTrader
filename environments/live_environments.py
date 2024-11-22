@@ -228,16 +228,15 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         change_ratio=float(np.abs(position_change))
         
         ## get the target potfolio distribution
-        position_target_id=int(np.argmin(np.abs(np.array(self.positions)-position_change)))
+        position_target_id=int(np.argmin(np.abs(np.array(self.positions)+position_change)))
         position_target=self.positions[position_target_id]
 
         dollar_val,n_asset=self.get_trade_size(change_ratio)
         
         info={
         'Current_position':current_position,
-        'New_position':position_target,
-
         'Trade_from':trade_from_to[0],
+        'New_position':trade_from_to[1],
         'Trade_to':trade_from_to[1],
         'Change_size':float(position_change),
         'Change_direction':buy_sell,

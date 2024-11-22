@@ -332,7 +332,7 @@ def refresh_crypto_data(data_dir='data',time_frame='1h',pairs=[]):
     }
 
     download(exchange_names = ["binanceus"],
-    symbols= tqdm(COIN_PAIRS),
+    symbols= tqdm(pairs),
     timeframe= time_frame,
     dir = data_dir,
     since= datetime.datetime(year= 2024, month= 1, day=1),

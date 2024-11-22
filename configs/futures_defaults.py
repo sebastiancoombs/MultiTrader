@@ -12,5 +12,6 @@ env_config = dict(
                 trading_fees = 0.01/100, # 0.01% per stock buy / sell (Binance fees)
                 borrow_interest_rate= 0.0003/100, # 0.0003% per timestep (one timestep = 1h here)
                 max_episode_duration=168,
-                verbose=0
+                verbose=0,
+                margin=2,
                 )
