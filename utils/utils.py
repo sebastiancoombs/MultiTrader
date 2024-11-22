@@ -11,7 +11,7 @@ from gluonts.time_feature import time_features_from_frequency_str
 from .ta_mapping import get_ta_funcs
 from IPython.display import display
 from gym_trading_env.downloader import EXCHANGE_LIMIT_RATES, download
-
+import re
 def add_indicator(func_name,data):
     try:
         func=getattr(TA,func_name)
@@ -141,6 +141,7 @@ def build_market_image(target_pair='ETH/USDT',time_frame='1h',axis=1,verbose=1,o
     files=glob.glob(f'{data_dir}/**{time_frame}.pkl',recursive=True)
 
     if only_target:
+        pair_name=re.sub(r'/|-|_','',target_pair)
         files=[f for f in files if target_pair.replace('/','') in f]
     print(files)
     big_data=[]

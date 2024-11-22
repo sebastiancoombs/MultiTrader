@@ -19,28 +19,40 @@ import boto3
 import shutil
 import tempfile
 from IPython.display import display
-from configs import defaults
 with tempfile.TemporaryDirectory() as temp_dir:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
+        from configs import spot_defaults as defaults
+
+
+
+        base_asset=defaults.base_asset
+        quote_asset=defaults.quote_asset
+        test_net=False
+        time_frame=defaults.time_frame
+
+        product_type=defaults.product_type
+        futures_target='DOG-29NOV24-CDE'
+        exchange=defaults.exchange
+        trade_target='/'.join([base_asset,quote_asset]) 
+        agent_path=defaults.agent_path
+
 
         s3= boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
+
+        print('Downloading files from S3')
+        print(f'Downloading {defaults.forecasting_model_path}')
         s3.download_file('coinbasetradehistory','trade.db','Trade_history/trade.db')
+
+        print(f'Downloading {defaults.forecasting_model_path}')
+        s3.download_file('coinbasetradehistory',defaults.forecasting_model_path,defaults.forecasting_model_path)
+
+        print(f'Downloading {agent_path}')
+        s3.download_file('coinbasetradehistory',agent_path,agent_path)
+
+        agent=pickle.load(open(agent_path,'rb'))
         forecast_model=NeuralForecast.load(defaults.forecasting_model_path)
-
-
-        base_asset='DOGE'
-        quote_asset='USDC'
-        test_net=False
-        time_frame='1h'
-        # product_type='FUTURE'
-        product_type='Spot'
-        futures_target='DOG-29NOV24-CDE'
-        exchange='coinbase'
-        trade_target='/'.join([base_asset,quote_asset]) if product_type.upper()=='SPOT' else  futures_target
-        trade_target
-
 
         live_env=BaseLiveTradingEnv(
                     api_key=coinbase_api_key,
@@ -53,16 +65,14 @@ with tempfile.TemporaryDirectory() as temp_dir:
                     history_path='Trade_history/trade.db',
                     exchange=exchange,
                     forecast_model=forecast_model,
-                    discord_webhook=disord_webhook,
+                    discord_webhook=discord_crypto_webhook,
 
                     )
 
 
+        
 
-        agent_path=f'Agent/pearl_{defaults.model_name}_model.pkl'
-        s3.download_file('coinbasetradehistory',f'pearl_{defaults.model_name}_model.pkl',agent_path)
 
-        agent=pickle.load(open(agent_path,'rb'))
 
         live_pearl_env=GymEnvironment(live_env)
 
@@ -82,7 +92,8 @@ with tempfile.TemporaryDirectory() as temp_dir:
         live_pearl_env.step(action)
         
         s3.upload_file('Trade_history/trade.db','coinbasetradehistory','trade.db',)
-        s3.upload_file(agent_path,'coinbasetradehistory',agent_path.split('/')[-1],)
+        s3.upload_file(agent_path,'coinbasetradehistory',agent_path)
+        s3.upload_file(defaults.forecasting_model_path,'coinbasetradehistory',defaults.forecasting_model_path)
 
         display(live_env.client.account())
 

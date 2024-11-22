@@ -1,13 +1,16 @@
-COIN_PAIRS=['EURUSD','USDJPY','GBPUSD','AUDUSD','USDCAD','USDCHF','NZDUSD'
+COIN_PAIRS=['EUR_USD','USD_JPY','GBP_USD','AUD_USD','USD_CAD','USD_CHF','NZD_USD'
             ]
-target_pair = 'USDJPY'
+base_asset='USD'
+quote_asset='JPY'
+target_pair = ''.join([base_asset,quote_asset])
 time_frame = '1h'
-
+product_type='FOREX'
 forecasting_model_path=f'ForecastingModels/{target_pair}ForecastingModel/'
 
-DATA_DIR='data_fx'
-model_name='JPYUSD'
-
+DATA_DIR='data_forex'
+model_name=target_pair
+agent_path=f'Agent/pearl_{model_name}_model.pkl'
+exchange='oanda'
 env_config = dict(
                 name='Symbol_train',
                 positions = [ -1,0, 1], # -1 (=SHORT), 0(=OUT), +1 (=LONG)

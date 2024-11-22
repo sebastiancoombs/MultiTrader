@@ -53,4 +53,5 @@ COPY Keys.py .
 EXPOSE 5000 443 80
 
 # Specify the command to run on container start
-ENTRYPOINT [ "python", "-m" , "trade_coinbase" ]
+ENTRYPOINT [ "/entry_point.sh" ]
+

@@ -12,4 +12,5 @@ matplotlib
 scikit-learn
 discord
 coinbase-advanced-py
+oandapyV20   
 boto3

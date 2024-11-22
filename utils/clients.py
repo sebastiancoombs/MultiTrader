@@ -9,11 +9,13 @@ import numpy as np
 import pandas as pd
 from IPython.display import display
 from tqdm.autonotebook import tqdm
+import requests
 try:
+    import oandapyV20 as oanda
     from oandapyV20 import API
     from oandapyV20.contrib.factories import InstrumentsCandlesFactory
     from oandapyV20.contrib.requests import MarketOrderRequest as OandaMarketOrder
-    from oandapyV20.endpoints import accounts, orders, pricing
+    from oandapyV20.endpoints import accounts, orders, pricing,positions,instruments
 except:
     print('need to install oandapyV20')
 
@@ -61,7 +63,7 @@ class BaseClient():
 
         self.set_base_quote_assets(symbol)
 
-        self._positions=None
+        self._positions=positions
         self._account=None
         self.trade_rules=None
 
@@ -103,6 +105,7 @@ class BaseClient():
 
 
         return rounded
+    
     def normalize_asset_size(self,size):
 
         balance=self.get_balance(self.base_asset)
@@ -177,6 +180,8 @@ class BaseClient():
         self.update_account()
         if self.product_type=='SPOT':
             port_value=self.get_spot_value()
+        elif self.product_type=='FOREX':
+            port_value=self.get_forex_value()
         else:
             port_value=self.get_futures_value()
         return port_value
@@ -185,8 +190,12 @@ class BaseClient():
         self.update_account()
         if self.product_type=='SPOT':
             position=self.get_spot_position()
+        elif self.product_type=='FOREX':
+            position=self.get_forex_position()
+        elif self.product_type=='FUTURES':
+            position=self.get_futures_position()
         else:
-            position,qty=self.get_futures_position()
+            raise ValueError(f'Invalid product type: {self.product_type}')
         return position  
 
     def get_date_range(self,start_date,end_date,freq='1h'):
@@ -281,6 +290,11 @@ class BaseClient():
         key={'listenKey':None}
         return key
 
+    def get_forex_position(self):
+        NotImplemented
+
+    def get_forex_value(self):
+        NotImplemented
 
 class CoinbaseClient(BaseClient):
     
@@ -316,6 +330,7 @@ class CoinbaseClient(BaseClient):
             self.trade_client=RESTClient(api_key,api_secret,base_url=self.paper_url)
         else:
             self.trade_client=RESTClient(api_key,api_secret)
+
         print(f'Paper Trading{self.paper} on coinbase at {self.trade_client.base_url}')
    
     def get_futures_position(self,symbol):
@@ -484,8 +499,10 @@ class CoinbaseClient(BaseClient):
         return trade_rules
 
     def get_price(self, symbol):
+        if symbol==None:
+            symbol=self.symbol
 
-        product=self.trade_client.get_product(product_id=self.symbol)
+        product=self.trade_client.get_product(product_id=symbol)
         price=float(product['price'])
         return price
     
@@ -571,49 +588,63 @@ class CoinbaseClient(BaseClient):
             order=self.buy(symbol,qty=qty)
         return order
 
-class BinanceClient(BaseClient):
-    
-    def __init__(self,api_key,api_secret,time_frame,symbol,paper=True,product_type='SPOT',*args,**kwargs) -> None:
-        super().__init__(*args,**kwargs)
-        self.paper_url=''
-
 class OandaClient(BaseClient):
 
-    def __init__(self,api_key,account_id,time_frame,symbol,paper=True,*args,**kwargs) -> None:
+    def __init__(self,*args,**kwargs) -> None:
+
+        self.account_id=None
+        super().__init__(*args,**kwargs)
+
+        self.oanda_time_frame= oanda_time_map[self.time_frame]
+        self._position_frame=None
+        self._trade_frame=None
+        self.exchange='oanda'
+
+    def connect(self,api_key,account_id,**kwargs):
+        self.trade_client=API(access_token=api_key,environment='practice' if self.paper else 'live',)
+        sesh=requests.Session()
+        sesh.verify=False
+        self.trade_client.client.session=sesh
+        self.account_id=account_id
+
+    def set_base_quote_assets(self,symbol=None):
+        super().set_base_quote_assets(symbol)
+        self.symbol='_'.join(self.symbol_list)
+
+    def check_symbol_format(self,symbol):
+
+        symbol=re.sub(r'_|-|/','',symbol)
+        front_asset=symbol[:3]
+        back_asset=symbol[3:]
+        better_symbol='_'.join([front_asset,back_asset])
+        return better_symbol
+    
+    def get_historical_data(self,symbol=None,start_date=None,end_date=None,verbose=False)->pd.DataFrame:
+
+        if symbol==None:
+            symbol=self.symbol
+
+        if start_date==None:
+            start_date=datetime.datetime.now()-pd.Timedelta(hours=350)
+        if end_date==None:
+            end_date=datetime.datetime.now()
 
         
-        super().__init__(*args,**kwargs)
-        self.api=API(access_token=api_key,environment='practice' if paper else 'live',)
-        self.account_id=account_id
-        self.data_client=None
-        self.oanda_time_frame= oanda_time_map[time_frame]
-        self.time_frame= time_frame
-        self.base_asset=symbol.split('_')[0]
-        self.quote_asset=symbol.split('_')[1]
-        self.symbol=symbol
-        self._positions=None
-        self._account=None
-        self.update_positions()
-        self.update_account(self)
-
-    def get_historical_data(self,start_date)->pd.DataFrame:
-
-
-        now=datetime.datetime.now()
+        submit_symbol=self.check_symbol_format(symbol)
 
         start_date=start_date.strftime('%Y-%m-%dT%H:%M:%SZ')
-        now=now.strftime('%Y-%m-%dT%H:%M:%SZ')
+        end_date=end_date.strftime('%Y-%m-%dT%H:%M:%SZ')
 
         params={
-            "granularity": oanda_time_map[self.time_frame],
+            "granularity": self.oanda_time_frame,
             "from": start_date,
-            "to": now,
+            "to": end_date,
         }
 
-        klines=InstrumentsCandlesFactory(instrument=self.symbol, params=params)
+        klines=InstrumentsCandlesFactory(instrument=submit_symbol, params=params)
         candles=[]
         for batch in klines:
-            resp = self.api.request(batch)
+            resp = self.trade_client.request(batch)
             
             for candle in resp.get('candles'):
 
@@ -633,38 +664,52 @@ class OandaClient(BaseClient):
                 except Exception as e:
 
                     print(e, klines)
-                    
-        return pd.DataFrame(candles)
+        candles=pd.DataFrame(candles)
+        
+        candles['symbol']=symbol
+        return candles
     
     def get_balance(self,symbol)->float:
+        try:
+            if symbol.lower() in ['usd','usdt']:
+                bal=self._account.loc['USD','balance']
 
-        if symbol.lower() in ['usd','usdt']:
-            bal=self._account.get('cash')
+        
+            else:
+                symbol=[c for c in self.symbol_list if symbol in c][0]
+                bal=self._account.loc[symbol,'balance']
+        except Exception as e:
+            print(e)
+            bal=0
 
-        # elif symbol==self.base_asset:
-        else:
-            bal=self._account.get(self.base_asset+self.quote_asset)
         
 
 
         return float(bal)
     
-    def update_account(self):
-        self.update_positions()
+    def update_account(self)->pd.DataFrame:
         req=accounts.AccountDetails(self.account_id)
-        account=self.api.request(req)['account']
-        account.pop('positions')
-        account.pop('trades')
+        account=self.trade_client.request(req)['account']
+        positions=account.pop('positions')
+        trades=account.pop('trades')
+        pos_frame=self.format_positions(positions)
+        trade_frame=self.format_trades(trades)
 
         account[self.base_asset+self.quote_asset]=account['positionValue']
         account['cash']=account['marginAvailable']
-        self._account=account
+        account_frame=pd.DataFrame([account])
 
-    def update_positions(self):
-        req=accounts.AccountDetails(self.account_id)
-        resp=self.api.request(req)['account']
-        positions = resp.get('positions')
-        
+        account_frame=account_frame.rename(columns={'currency':'symbol'})
+        account_frame=account_frame.set_index('symbol')
+        account_frame=account_frame[['balance','pl','unrealizedPL','NAV','marginUsed','marginAvailable','positionValue']]
+
+        full_account_frame=pd.concat([account_frame,trade_frame],axis=0)
+        full_account_frame.index=[self.strip_quote(symbol) for symbol in full_account_frame.index]
+        self._account=full_account_frame
+
+        return self._account
+    
+    def format_positions(self,positions=None):
         position_list=[self.format_position(p) for p in positions]
         positions=[]
         for pos in position_list:
@@ -672,9 +717,24 @@ class OandaClient(BaseClient):
                 positions.append(p)
         pos_frame=pd.DataFrame.from_dict(positions)
         if len (pos_frame)>0:
-            pos_frame.set_index('symbol')
+            pos_frame=pos_frame.set_index('symbol')
             pos_frame=pos_frame[sorted(pos_frame.columns)]
-        self._positions=pos_frame
+            pos_frame.rename(columns={'units':'balance'},inplace=True)
+        else:
+            pos_frame=pd.DataFrame()
+        self._position_frame=pos_frame
+        return self._positions
+    
+    def format_trades(self,trades=None):
+        trade_frame=pd.DataFrame(trades)
+        if len(trade_frame)>0:
+            trade_frame.rename(columns={'instrument':'symbol','currentUnits':'balance'},inplace=True)
+            trade_frame.set_index('symbol',inplace=True)
+            trade_frame=trade_frame[sorted(trade_frame.columns)]
+        else:
+            trade_frame=pd.DataFrame()
+        self._trade_frame=trade_frame
+        return trade_frame
 
     def format_position(self,position)->Dict:
         position_list=[]
@@ -693,46 +753,41 @@ class OandaClient(BaseClient):
             position_list.append(short)
 
         return position_list
-    
-    def account(self)->Dict:
+
+    def get_forex_position(self,symbol=None):
         self.update_account()
-        return self._account
+        positions=self._position_frame
+
+        if symbol==None:
+            symbol=self.symbol
+
+        symbol=self.check_symbol_format(symbol)
+
+        if len(positions)==0:
+            return 0
+        else:
+            value=self.get_forex_value()
+            price=self.get_price(symbol=symbol)
+            qty=positions.loc[symbol,'balance']
+            asset_value=abs(price*qty)
+            position_ratio=value/asset_value
+            
+            if qty>0:   
+                return 1*position_ratio
+            elif qty<0:
+                return -1*position_ratio
     
-    def check_params(self,**kwargs):
-
-        symbol=kwargs.get('symbol')
-
-        qty=kwargs.get('notional')
-        side=kwargs.get('side')
-        
-        if side.lower()=='sell':
-            qty=-qty
-        
-        mktOrder=OandaMarketOrder(
-                        instrument=symbol,
-                        units=qty,
-                        
-                        )
-        
-        order_params = orders.OrderCreate(self.account_id, data=mktOrder.data)
-
-        return order_params
-    
-    def new_order(self,**kwargs):
-        order_params=self.check_params(**kwargs)
-
-        try:
-            # create the OrderCreate request
-            resp = self.api.request(order_params)
-        except oanda.exceptions.V20Error as err:
-            print(order_params.status_code, err)
+    def get_forex_value(self):
+        self.update_account()
+        value=self._account.loc['USD','NAV']
+        return float(value)
     
     def get_symbol_info(self):
 
         params={"instruments":self.symbol}
 
         req=pricing.PricingInfo(self.account_id, params=params)
-        trade_info=self.api.request(req)['prices'][0]
+        trade_info=self.trade_client.request(req)['prices'][0]
         return trade_info
     
     def get_trade_rules(self):
@@ -748,14 +803,96 @@ class OandaClient(BaseClient):
                         )
         return trade_rules
          
-    def ticker_price(self,symbol):
+    def get_price(self,symbol=None):
+        
+        if symbol==None:
+            symbol=self.symbol
+        symbol=self.check_symbol_format(symbol)
         params={"instruments":symbol}
 
         req=pricing.PricingInfo(self.account_id, params=params)
-        resp=self.api.request(req)
+        resp=self.trade_client.request(req)
         bid=float(resp['prices'][0]['closeoutBid'])
         ask=float(resp['prices'][0]['closeoutAsk'])
         return float(np.mean([bid,ask]))
+    
+    def strip_quote(self,symbol):
+        if symbol=='USD':
+            return symbol
+        else:
+            strip_pattern=f'/|_|-|USD'
+            asset=re.sub(strip_pattern,'',symbol)
+            return asset
+        
+    def send_order(self,order_params):
+
+        try:
+            # create the OrderCreate request
+            resp = self.trade_client.request(order_params)
+        except oanda.exceptions.V20Error as err:
+            print(order_params.status_code, err)
+
+        return order_params
+    
+    def convert_dollars_to_units(self,symbol,dollars):
+        price=self.get_price(symbol)
+        units=dollars/price
+        return units
+    
+    def buy(self,symbol=None,quote_size=1,order_id=None):
+        if symbol==None:
+            symbol=self.symbol
+
+        units=self.convert_dollars_to_units(symbol,quote_size)
+
+        units=int(units)
+        units=str(units)
+        symbol=self.check_symbol_format(symbol)
+        mktOrder=OandaMarketOrder(
+                        instrument=symbol,
+                        units=units,
+                        
+                        )
+        
+        order_params = orders.OrderCreate(self.account_id, data=mktOrder.data)
+        order_resp=self.send_order(order_params)
+        return order_resp
+    
+    def sell(self,symbol=None,asset_size=1,order_id=None):
+        if symbol==None:
+            symbol=self.symbol
+        symbol=self.check_symbol_format(symbol)
+
+        units=int(asset_size)
+        units=-units
+        units=str(units)
+        mktOrder=OandaMarketOrder(
+                        instrument=symbol,
+                        units=units,
+                        )
+        
+        order_params = orders.OrderCreate(self.account_id, data=mktOrder.data)
+        order_resp=self.send_order(order_params)
+        return order_resp
+
+    def close(self,symbol=None):
+        if symbol==None:
+            symbol=self.symbol
+        side=self._position_frame.loc[symbol,'side']
+        qty=abs(self._position_frame.loc[symbol,'balance'])
+        if side=='buy':
+            order=self.sell(symbol,qty=qty)
+        else:
+            order=self.buy(symbol,qty=qty)
+        
+        return order
+
+class BinanceClient(BaseClient):
+    
+    def __init__(self,api_key,api_secret,time_frame,symbol,paper=True,product_type='SPOT',*args,**kwargs) -> None:
+        super().__init__(*args,**kwargs)
+        self.paper_url=''
+
 
 class AlpacaClient():
 

@@ -51,7 +51,8 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         self.allow_trade_submit=True
         
         self.supported_exchanges=['coinbase',
-                                #   'binance','alpaca','oanda'
+                                    'oanda',
+                                #   'binance','alpaca',
                                   ]
         self.pred_df=None
         self.raw_df=None

@@ -3,6 +3,8 @@ COIN_PAIRS=['DOGE/USDT','LTC/USDT','SHIB/USDT','ETH/USDT','BTC/USDT','XRP/USDT',
 target_pair = 'DOGEUSD_Futures'
 time_frame = '1h'
 forecasting_model_path=f'ForecastingModels/{target_pair}ForecastingModel/'
+product_type='FUTURES'
+
 DATA_DIR='data_futures'
 model_name=target_pair
 env_config = dict(
