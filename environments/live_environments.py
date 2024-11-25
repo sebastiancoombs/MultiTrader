@@ -97,6 +97,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         df=self.get_data()
         kwargs['df']=df
         super().__init__(*args,**kwargs)
+        self.positions=kwargs['positions']
 
     def set_base_quote_assets(self):
         self.quote_asset=self.client.quote_asset
@@ -176,6 +177,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
     def plot_forecasts(self,plot_df,symb):
         fig,axes=plt.subplots(sharex=True, sharey=True, figsize=(10, 5))
         time=pd.Timestamp(plot_df['ds'].values[-1]).strftime('%m-%d-%Y %I:%M%p')
+        plot_df['ds']=pd.to_datetime(plot_df['ds'])
 
         axes.plot(plot_df['ds'], plot_df['close'], label='Close Price')
         for model in plot_df.select_dtypes(np.number).columns:
@@ -219,6 +221,8 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         self._position=self.client.get_current_position()
         current_position_idx=int(np.argmin(np.abs(np.array(self.positions)-self._position)))
         current_position=self.positions[current_position_idx]
+
+        current_position=current_position if self._position!=0 else self._position
 
         ## get size of assets we have
         trade_from_to=[self._position,new_position]
@@ -304,36 +308,45 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
 
                 send_message_to_channel(self.discord_webhook,message)
                 plot_df=self.prepare_plot_df()
-                display(plot_df)
+                # display(plot_df)
                 fig=self.plot_forecasts(plot_df=plot_df,symb=self.base_asset)
-                fig_time=pd.Timestamp.now().strftime('%m-%d-%Y %I:%M%p')
-                fig_name=f'{fig_time}_forecasts.png'
+                fig_time=pd.Timestamp.now().strftime('%m-%d%I:%M%p')
+                fig_name=f'{fig_time}_{self.symbol}_forecasts.png'
                 fig.savefig(fig_name)
                 send_picture_to_channel(self.discord_webhook,file=fig_name)
                 
             except Exception as e:
                 traceback.print_exc()
 
-        history=pd.DataFrame([info])
+        history=pd.DataFrame([info]).astype(str)
+        
+        try:
+            prices=history['fullPrice'].apply(lambda x: pd.Series(x))
+            history[prices.columns]=prices
+        except:
+            pass
 
         try:
             order=history['response'].apply(lambda x: pd.Series(x))
             history[order.columns]=order
         except:
             pass
-        display(history)
+ 
         try:
             history.to_sql(f'{self.base_asset}_trade_history',conn,if_exists='append',index=False)
         except Exception as e:
             print(e)
             old_history=self.load_history()
-            new_history=pd.concat([old_history,history])
+            new_history=pd.concat([old_history,history],axis=0)
+            new_history=new_history.astype(str)
+
             new_history.to_sql(f'{self.base_asset}_trade_history',conn,if_exists='replace',index=False)
         conn.close()
         return
     
     def get_reward(self):
         history=self.load_history()
+        
         try:
             reward=self.reward_function(history)
         except Exception as e:

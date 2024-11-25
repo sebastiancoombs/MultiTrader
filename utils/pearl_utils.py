@@ -154,7 +154,8 @@ def test_pearl_model( agent,env,n_samples=100):
     env = GymEnvironment(env)
     profits=[]
     n_trades=[]
-    for i in range(n_samples):
+    bar=tqdm(range(n_samples))
+    for i in bar:
         observation, action_space = env.reset()
         agent.reset(observation, action_space)
         done = False
@@ -169,14 +170,15 @@ def test_pearl_model( agent,env,n_samples=100):
         test_env=env.env.unwrapped
         profits.append(test_env.historical_info['portfolio_valuation',-1])
         n_trades.append(sum(np.abs(np.diff(test_env.historical_info['position']))))
+        bar.set_description(f"Profit: {np.mean(profits)}, Number of Trades: {np.mean(n_trades)}")
 
     return np.mean(profits),np.mean(n_trades)
 
 def load_agent_from_study(study_path,study_name,observation_space_dim=30,action_space_dim=2,version=1):
-    study = optuna.create_study(study_name=study_name,
-                            directions=["maximize", "maximize"],
+    study = optuna.load_study(study_name=study_name,
+
                             storage=study_path,
-                            load_if_exists=True,
+
                             )
     best_trials=study.best_trials
     best_trail=best_trials[version]

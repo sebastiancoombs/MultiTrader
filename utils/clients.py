@@ -15,7 +15,7 @@ try:
     from oandapyV20 import API
     from oandapyV20.contrib.factories import InstrumentsCandlesFactory
     from oandapyV20.contrib.requests import MarketOrderRequest as OandaMarketOrder
-    from oandapyV20.endpoints import accounts, orders, pricing,positions,instruments
+    from oandapyV20.endpoints import accounts, orders, pricing,positions,instruments,transactions
 except:
     print('need to install oandapyV20')
 
@@ -754,6 +754,18 @@ class OandaClient(BaseClient):
 
         return position_list
 
+    def get_orders(self):
+        req=transactions.TransactionList(accountID=self.account_id)
+
+        last_id=self.trade_client.request(req)['lastTransactionID']
+        first_id='1'
+        params={'from':first_id,'to':last_id}
+        t_req=transactions.TransactionIDRange(accountID=self.account_id,params=params)
+        trans_history=self.trade_client.request(t_req)
+        trans_history['transactions']
+        trans_frame=pd.DataFrame(trans_history['transactions'])
+        return trans_frame
+
     def get_forex_position(self,symbol=None):
         self.update_account()
         positions=self._position_frame
@@ -768,7 +780,13 @@ class OandaClient(BaseClient):
         else:
             value=self.get_forex_value()
             price=self.get_price(symbol=symbol)
-            qty=positions.loc[symbol,'balance']
+            if len(positions)>0:
+                qty=positions.loc[symbol,'balance']
+                qty=float(qty)
+            else:
+                
+                return 0
+            display(positions)
             asset_value=abs(price*qty)
             position_ratio=value/asset_value
             
@@ -825,14 +843,33 @@ class OandaClient(BaseClient):
             return asset
         
     def send_order(self,order_params):
-
+        info={'success':False}
         try:
             # create the OrderCreate request
             resp = self.trade_client.request(order_params)
-        except oanda.exceptions.V20Error as err:
-            print(order_params.status_code, err)
+            fill_info=resp.pop('orderFillTransaction')
+            if fill_info:
+                fill_info['success']=True
+                extra_info=['tradeOpened','tradesClosed','fullPrice','gainQuoteHome','tradeReduced','homeConversionFactors']
+                for e in extra_info:
+                    try:
+                        fill_info.pop(e)        
+                    except:
+                        pass
+                info.update(fill_info)
 
-        return order_params
+        except oanda.exceptions.V20Error as err:
+            print(err)
+            resp=err.__dict__['msg']
+            # print(resp)
+            fill_info={'success':False,'error':resp}
+            info.update(fill_info)
+        # import json
+        # print(json.dumps(resp,indent=4))
+
+
+        return info
+        
     
     def convert_dollars_to_units(self,symbol,dollars):
         price=self.get_price(symbol)
@@ -856,14 +893,15 @@ class OandaClient(BaseClient):
         
         order_params = orders.OrderCreate(self.account_id, data=mktOrder.data)
         order_resp=self.send_order(order_params)
+
         return order_resp
     
-    def sell(self,symbol=None,asset_size=1,order_id=None):
+    def sell(self,symbol=None,base_size=1,order_id=None):
         if symbol==None:
             symbol=self.symbol
         symbol=self.check_symbol_format(symbol)
 
-        units=int(asset_size)
+        units=int(base_size)
         units=-units
         units=str(units)
         mktOrder=OandaMarketOrder(

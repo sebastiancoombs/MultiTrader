@@ -45,8 +45,8 @@ class BoxTradingEnv(TradingEnv):
 
 class NormTradingEnvironment(TradingEnv):
     def __init__(self, margin=1,*args, **kwargs):
-        kwargs['positions']=[p*margin for p in kwargs['positions']]
-        self.margin=margin
+        # kwargs['positions']=[p*margin for p in kwargs['positions']]
+        # self.margin=margin
         super().__init__(*args, **kwargs)
         
     def _get_obs(self):
