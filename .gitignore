@@ -23,3 +23,4 @@ brokers/account_managers
 /PPO_test_render_logs
 /Rayrl_tune
 *.png
+Agent/pearl_USDJPY_model.pkl

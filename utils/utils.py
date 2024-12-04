@@ -217,7 +217,7 @@ def simulate_forecasts(model,df,refit_scalers=False):
 
 def generate_forecasts(model,df):
     
-    pred_df= model.predict(df)
+    pred_df= model.predict(df,verbose=0)
     pred_df=pred_df.reset_index()
     pred_cols=pred_df.filter(like='Auto').columns
     pred_df['mean_pred']=pred_df[pred_cols].mean(axis=1)

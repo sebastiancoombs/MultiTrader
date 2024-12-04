@@ -18,6 +18,7 @@ from Pearl.pearl.utils.instantiations.environments.gym_environment import \
 import boto3
 import shutil
 import tempfile
+import datetime
 from IPython.display import display
 with tempfile.TemporaryDirectory() as temp_dir:
     with warnings.catch_warnings():
@@ -72,15 +73,21 @@ with tempfile.TemporaryDirectory() as temp_dir:
         observation,action_space=live_pearl_env.reset()
         # agent.reset(observation, action_space)
         ## pretend to do the first trade
-        current_position=int(live_env.client.get_current_position())
-        current_position_idx=int(np.argmin(np.abs(np.array(live_env.positions)-live_env._position)))
-        # action=agent.act(exploit=True)
-        live_pearl_env.env.allow_trade_submit=False
+        # at the beginning of the week learn and reset
+        if datetime.datetime.now().hour==0 and datetime.datetime.now().weekday()==1:
+            agent.learn()
+            agent.reset(observation,action_space)
 
-        action_result=live_pearl_env.step(action=current_position_idx)
+        
+        else:
+            last_action=live_env.get_last_action()
+            # action=agent.act(exploit=True)
+            live_pearl_env.env.allow_trade_submit=False
+            action_result=live_pearl_env.step(action=last_action)
+            agent.observe(action_result)
+
 
         live_pearl_env.env.allow_trade_submit=True
-        agent.observe(action_result)
         action=agent.act(exploit=True)
         live_pearl_env.step(action)
         

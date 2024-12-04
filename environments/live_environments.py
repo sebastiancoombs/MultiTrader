@@ -49,6 +49,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         self.product_type=product_type.upper()
         self.discord_webhook=discord_webhook
         self.allow_trade_submit=True
+        self.time_format='%m-%d-%Y %I:%M %p %Z'
         
         self.supported_exchanges=['coinbase',
                                     'oanda',
@@ -125,7 +126,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
     def get_info(self,old_info):
             
         new_info={
-            'date':pd.Timestamp.now(tz='US/Pacific').strftime('%m-%d-%Y %I:%M %p %Z'),
+            'date':pd.Timestamp.now(tz='US/Pacific').strftime(self.time_format),
             'base_asset':self.base_asset,
             'quote_asset':self.quote_asset,
             'data_symbol':self.symbol,
@@ -196,6 +197,14 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         data=self.get_data()
         self._set_df(data)
         obs=super()._get_obs()
+        real_position=self.client.get_current_position()
+        position=self.get_last_action()
+        
+        ## last column is the real position
+        ## second to last is the action position
+        obs[-1]=real_position
+        obs[-2]=position
+
         return obs
 
     def get_trade_size(self,change_ratio):
@@ -216,10 +225,16 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         else:
             print(f'{self.product_type} Not supported')
 
-    def _trade(self, new_position):
-        ## get current asset to dollar ratio closest to self.positions
+    def get_last_action(self):
         self._position=self.client.get_current_position()
         current_position_idx=int(np.argmin(np.abs(np.array(self.positions)-self._position)))
+
+        return current_position_idx
+
+    def _trade(self, new_position):
+        ## get current asset to dollar ratio closest to self.positions
+
+        current_position_idx=self.get_last_action()
         current_position=self.positions[current_position_idx]
 
         current_position=current_position if self._position!=0 else self._position
@@ -230,7 +245,7 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         ## decide which direction to go
         
         buy_sell=int(np.sign(position_change))
-        change_ratio=float(np.abs(position_change))
+        change_ratio=float(abs(position_change))
         
         ## get the target potfolio distribution
         position_target_id=int(np.argmin(np.abs(np.array(self.positions)+position_change)))
@@ -260,12 +275,12 @@ class BaseLiveTradingEnv(NormTradingEnvironment):
         
         elif buy_sell==-1:
             print('Sell')
-            order_info=self.client.sell(base_size=n_asset,order_id=order_id)
+            order_info=self.client.sell(quote_size=dollar_val,base_size=n_asset,order_id=order_id)
             info.update(order_info)
 
         elif buy_sell==1:
             print('Buy')
-            order_info=self.client.buy(quote_size=dollar_val,order_id=order_id)
+            order_info=self.client.buy(quote_size=dollar_val,base_size=n_asset,order_id=order_id)
             info.update(order_info)
 
         return info

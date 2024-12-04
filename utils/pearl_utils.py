@@ -171,7 +171,10 @@ def test_pearl_model( agent,env,n_samples=100):
         profits.append(test_env.historical_info['portfolio_valuation',-1])
         n_trades.append(sum(np.abs(np.diff(test_env.historical_info['position']))))
         bar.set_description(f"Profit: {np.mean(profits)}, Number of Trades: {np.mean(n_trades)}")
-
+    agent.replay_buffer.clear()
+    agent.reset(observation,action_space)
+    agent.act(exploit=True)
+    agent.observe(action_result)
     return np.mean(profits),np.mean(n_trades)
 
 def load_agent_from_study(study_path,study_name,observation_space_dim=30,action_space_dim=2,version=1):
@@ -218,5 +221,5 @@ def train_production_agent(agent,learning_params,train_env,test_env,save_path):
     profit,n_trades=test_pearl_model(agent,test_env)
     print(f"Testing Return AVG Profit: {profit}, AVG Number of Trades: {n_trades}")
     agent=train_pearl_model(agent,test_env,**learning_params)
-    pickle.dump(agent.policy_learner.state_dict(),open(save_path,'wb'))
+    
     return agent,profit,n_trades

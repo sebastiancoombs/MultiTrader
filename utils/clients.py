@@ -492,8 +492,10 @@ class CoinbaseClient(BaseClient):
                             quote_asset_precision=self.get_precision(trade_info['quote_increment']),
                             )
         except Exception as e:
-            display(product_frame)
+            print('--------------------------------')
             print('Failed to set trade rules, target symbol is probabaly wrong:',e)
+
+            display(product_frame)
 
             trade_rules=None
         return trade_rules
@@ -609,6 +611,13 @@ class OandaClient(BaseClient):
 
     def set_base_quote_assets(self,symbol=None):
         super().set_base_quote_assets(symbol)
+        symbol=re.sub(r'_|-|/','',symbol)
+        front_asset=symbol[:3]
+        back_asset=symbol[3:]
+        self.symbol_list=[front_asset,back_asset]
+        self.base_asset=front_asset
+        self.quote_asset=back_asset
+        self.symbol_list=[front_asset,back_asset]
         self.symbol='_'.join(self.symbol_list)
 
     def check_symbol_format(self,symbol):
@@ -616,6 +625,10 @@ class OandaClient(BaseClient):
         symbol=re.sub(r'_|-|/','',symbol)
         front_asset=symbol[:3]
         back_asset=symbol[3:]
+        self.symbol_list=[front_asset,back_asset]
+        self.base_asset=front_asset
+        self.quote_asset=back_asset
+        self.symbol='_'.join([front_asset,back_asset])
         better_symbol='_'.join([front_asset,back_asset])
         return better_symbol
     
@@ -784,11 +797,14 @@ class OandaClient(BaseClient):
                 qty=positions.loc[symbol,'balance']
                 qty=float(qty)
             else:
-                
+                ## is no open position return closed
                 return 0
-            display(positions)
-            asset_value=abs(price*qty)
-            position_ratio=value/asset_value
+            # display(positions)
+            asset_value=abs(qty*price)
+            if self.base_asset=='USD':
+                position_ratio=abs(qty)/value
+            else:
+                position_ratio=asset_value/value
             
             if qty>0:   
                 return 1*position_ratio
@@ -876,11 +892,18 @@ class OandaClient(BaseClient):
         units=dollars/price
         return units
     
-    def buy(self,symbol=None,quote_size=1,order_id=None):
+    def buy(self,symbol=None,quote_size=1,base_size=None,order_id=None):
         if symbol==None:
             symbol=self.symbol
 
-        units=self.convert_dollars_to_units(symbol,quote_size)
+        if self.base_asset=='USD':
+            units=base_size
+
+        # else:
+        
+        units=quote_size
+            
+        
 
         units=int(units)
         units=str(units)
@@ -896,12 +919,18 @@ class OandaClient(BaseClient):
 
         return order_resp
     
-    def sell(self,symbol=None,base_size=1,order_id=None):
+    def sell(self,symbol=None,quote_size=None,base_size=1,order_id=None):
         if symbol==None:
             symbol=self.symbol
+        
+        if self.base_asset=='USD':
+            units=quote_size
+        else:
+            units=self.convert_dollars_to_units(symbol,base_size)
+
         symbol=self.check_symbol_format(symbol)
 
-        units=int(base_size)
+        units=int(units)
         units=-units
         units=str(units)
         mktOrder=OandaMarketOrder(
